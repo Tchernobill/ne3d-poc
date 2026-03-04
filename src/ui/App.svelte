@@ -29,7 +29,7 @@
   <div class="ne3d-toolbar">
     <div class="ne3d-title">Narrative Engine 3D</div>
     <div class="ne3d-controls">
-      <label>Scenes tracked: {$sceneStore.length}</label>
+      <p>Scenes tracked: {$sceneStore.length}</p>
       <span style="margin-left: 20px; color: var(--text-accent);">
         {#if $selectedSceneStore}
           Selected: {$selectedSceneStore.title}

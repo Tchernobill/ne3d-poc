@@ -9,21 +9,19 @@ const prod = mode === "production";
 const watch = mode === "watch";
 
 const context = await esbuild.context({
-  entryPoints:["src/main.ts"],
+  entryPoints: ["src/main.ts"],
   bundle: true,
-  external:[
+  format: "cjs",
+  platform: "browser", // IMPORTANT
+  target: "es2018",
+  mainFields: ["module", "main"],
+  external: [
     "obsidian",
     "electron",
     ...builtins
   ],
-  format: "cjs",
-  target: "es2018",
-  mainFields:["module", "main"],
-  logLevel: "info",
-  sourcemap: prod ? false : "inline",
-  treeShaking: true,
   outfile: "main.js",
-  plugins:[
+  plugins: [
     esbuildSvelte({
       compilerOptions: { css: "injected" },
       preprocess: sveltePreprocess(),

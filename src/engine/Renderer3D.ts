@@ -170,11 +170,15 @@ export class Renderer3D {
 
   private resize() {
     if (!this.container || !this.camera || !this.renderer) return;
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
+    const width = this.container.clientWidth; //
+    const height = this.container.clientHeight; //
+    
+    // Prevent NaN projection matrix corruption
+    if (width === 0 || height === 0) return; 
+
+    this.camera.aspect = width / height; //
+    this.camera.updateProjectionMatrix(); //
+    this.renderer.setSize(width, height); //
   }
 
   private animate = () => {

@@ -8,6 +8,200 @@ Directory structure:
     ├── manifest.json
     ├── package.json
     ├── styles.css
+    ├── tchernobill-ne3d-poc.txt
+    ├── tsconfig.json
+    ├── .eslintrc.cjs
+    ├── .prettierrc
+    ├── src/
+    │   ├── main.ts
+    │   ├── NE3DView.ts
+    │   ├── engine/
+    │   │   ├── FrontmatterWriteQueue.ts
+    │   │   ├── Renderer3D.ts
+    │   │   ├── ResourceTracker.ts
+    │   │   ├── SceneIndexer.ts
+    │   │   ├── SceneStore.ts
+    │   │   └── TimelineLayout.ts
+    │   ├── renderer/
+    │   │   └── Renderer3D.ts
+    │   ├── ui/
+    │   │   ├── App.svelte
+    │   │   └── InspectorPanel.svelte
+    │   └── view/
+    │       └── NE3DView.ts
+    └── types/
+        └── obsidian.d.ts
+
+================================================
+FILE: README.md
+================================================
+﻿# ne3d-poc
+
+3D Narrative Engine Plugin for Obsidian.
+
+## Development
+npm install
+npm run watch
+
+## Build
+npm run build
+
+## Release
+npm run release
+
+
+
+================================================
+FILE: build-release.mjs
+================================================
+﻿import { execSync } from 'child_process';
+import fs from 'fs';
+
+const manifest = JSON.parse(fs.readFileSync('manifest.json'));
+const version = manifest.version;
+const zipName = manifest.id + '-' + version + '.zip';
+
+execSync('tar -a -c -f ' + zipName + ' manifest.json main.js styles.css', { stdio: 'inherit' });
+
+console.log('Release built:', zipName);
+
+
+
+================================================
+FILE: esbuild.config.mjs
+================================================
+﻿import esbuild from "esbuild";
+import process from "process";
+import builtins from "builtin-modules";
+import esbuildSvelte from "esbuild-svelte";
+import sveltePreprocess from "svelte-preprocess";
+
+const mode = process.argv[2];
+const prod = mode === "production";
+const watch = mode === "watch";
+
+const context = await esbuild.context({
+  entryPoints:["src/main.ts"],
+  bundle: true,
+  external:[
+    "obsidian",
+    "electron",
+    ...builtins
+  ],
+  format: "cjs",
+  target: "es2018",
+  mainFields:["module", "main"],
+  logLevel: "info",
+  sourcemap: prod ? false : "inline",
+  treeShaking: true,
+  outfile: "main.js",
+  plugins:[
+    esbuildSvelte({
+      compilerOptions: { css: "injected" },
+      preprocess: sveltePreprocess(),
+    }),
+  ],
+});
+
+if (watch) {
+  await context.watch();
+  console.log("Watching for changes...");
+} else {
+  await context.rebuild();
+  console.log("Build complete.");
+  process.exit(0);
+}
+
+
+================================================
+FILE: Gitingest001.txt
+================================================
+[Empty file]
+
+
+================================================
+FILE: LICENSE
+================================================
+﻿MIT License
+
+Copyright (c) 2026
+
+Permission is hereby granted, free of charge...
+
+
+
+================================================
+FILE: manifest.json
+================================================
+{
+  "id": "ne3d-poc",
+  "name": "Narrative Engine 3D (PoC)",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "3D Narrative Engine Plugin",
+  "author": "Kyr4n",
+  "isDesktopOnly": true
+}
+
+
+================================================
+FILE: package.json
+================================================
+{
+  "name": "ne3d-poc",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs watch",
+    "build": "node esbuild.config.mjs production",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "release": "node build-release.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/three": "^0.160.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "builtin-modules": "^5.0.0",
+    "esbuild": "^0.20.0",
+    "esbuild-svelte": "^0.8.0",
+    "eslint": "^8.0.0",
+    "obsidian": "latest",
+    "prettier": "^3.0.0",
+    "svelte": "^4.2.8",
+    "svelte-preprocess": "^5.1.3",
+    "tslib": "2.4.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "three": "^0.160.0"
+  }
+}
+
+
+
+================================================
+FILE: styles.css
+================================================
+[Empty file]
+
+
+================================================
+FILE: tchernobill-ne3d-poc.txt
+================================================
+Directory structure:
+└── tchernobill-ne3d-poc/
+    ├── README.md
+    ├── build-release.mjs
+    ├── esbuild.config.mjs
+    ├── Gitingest001.txt
+    ├── LICENSE
+    ├── manifest.json
+    ├── package.json
+    ├── styles.css
     ├── tchernobill-ne3d-poc-8a5edab282632443.txt
     ├── tsconfig.json
     ├── .eslintrc.cjs
@@ -852,6 +1046,816 @@ FILE: src/ui/App.svelte
     position: relative;
     width: 100%;
     height: 100%;
+  }
+</style>
+
+
+================================================
+FILE: src/view/NE3DView.ts
+================================================
+﻿export class NE3DView {
+  constructor() {
+    console.log('NE3DView initialized');
+  }
+}
+
+
+
+================================================
+FILE: types/obsidian.d.ts
+================================================
+﻿declare module 'obsidian' {
+    export interface Plugin {
+        onload(): void;
+        onunload(): void;
+        [key: string]: any;
+    }
+    export class Plugin {
+        async onload(): Promise<void> {}
+        async onunload(): Promise<void> {}
+    }
+    export interface WorkspaceLeaf { [key: string]: any }
+    export interface TFile { [key: string]: any }
+}
+
+
+
+
+
+================================================
+FILE: tsconfig.json
+================================================
+﻿{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "inlineSourceMap": true,
+    "inlineSources": true,
+    "module": "ESNext",
+    "target": "ES6",
+    "allowJs": true,
+    "strict": true,
+    "moduleResolution": "node",
+    "importHelpers": true,
+    "isolatedModules": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib":["DOM", "ES5", "ES6", "ES7"]
+  },
+  "include":["src/**/*.ts", "src/**/*.svelte"]
+}
+
+
+================================================
+FILE: .eslintrc.cjs
+================================================
+﻿module.exports = {
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint'],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
+  env: { node: true, es2021: true }
+};
+
+
+
+================================================
+FILE: .prettierrc
+================================================
+﻿{
+  "semi": true,
+  "singleQuote": true
+}
+
+
+
+================================================
+FILE: src/main.ts
+================================================
+﻿import { Plugin, WorkspaceLeaf } from 'obsidian';
+import { NE3DView, VIEW_TYPE_NE3D } from './NE3DView';
+import { SceneIndexer } from './engine/SceneIndexer';
+import { FrontmatterWriteQueue } from './engine/FrontmatterWriteQueue';
+
+export default class NE3DPlugin extends Plugin {
+  public indexer!: SceneIndexer;
+  public writeQueue!: FrontmatterWriteQueue;
+
+  async onload() {
+    // 1. Initialize the Data Layer
+    // Passing "" means it will scan the entire vault for now
+    this.indexer = new SceneIndexer(this.app, ""); 
+    this.writeQueue = new FrontmatterWriteQueue(this.app);
+    
+    // Wait for Obsidian's cache to be ready, then index
+    this.app.workspace.onLayoutReady(() => {
+      this.indexer.indexVault();
+    });
+
+    // 2. Register Live Updates (Event-driven Architecture)
+    this.registerEvent(
+      this.app.metadataCache.on('changed', (file) => {
+        // When any file changes, re-index to update the 3D view live
+        this.indexer.indexVault();
+      })
+    );
+
+    // 3. Register the custom ItemView
+    //this.registerView(VIEW_TYPE_NE3D, (leaf) => new NE3DView(leaf));
+
+    // NEW: Pass the writeQueue into the View
+    this.registerView(VIEW_TYPE_NE3D, (leaf) => new NE3DView(leaf, this.writeQueue));
+
+    // 4. Add a ribbon icon to open the 3D Canvas
+    this.addRibbonIcon('box', 'Open NE3D Canvas', () => {
+      this.activateView();
+    });
+  }
+
+  onunload() {
+    this.app.workspace.detachLeavesOfType(VIEW_TYPE_NE3D);
+  }
+
+  async activateView() {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | null = null;
+    const leaves = workspace.getLeavesOfType(VIEW_TYPE_NE3D);
+
+    if (leaves.length > 0) {
+      leaf = leaves[0];
+    } else {
+      leaf = workspace.getRightLeaf(false);
+      await leaf?.setViewState({ type: VIEW_TYPE_NE3D, active: true });
+    }
+
+    if (leaf) workspace.revealLeaf(leaf);
+  }
+}
+
+
+================================================
+FILE: src/NE3DView.ts
+================================================
+import { ItemView, WorkspaceLeaf } from 'obsidian';
+import App from './ui/App.svelte';
+import { FrontmatterWriteQueue } from './engine/FrontmatterWriteQueue';
+
+export const VIEW_TYPE_NE3D = "ne3d-view";
+
+export class NE3DView extends ItemView {
+  component!: App;
+  writeQueue: FrontmatterWriteQueue;
+
+  constructor(leaf: WorkspaceLeaf, writeQueue: FrontmatterWriteQueue) {
+    super(leaf);
+    this.writeQueue = writeQueue;
+  }
+
+  getViewType() {
+    return VIEW_TYPE_NE3D;
+  }
+
+  getDisplayText() {
+    return "NE3D Visualizer";
+  }
+
+  getIcon() {
+    return "box";
+  }
+
+  async onOpen() {
+    // Mount the Svelte App to the Obsidian view container
+    this.component = new App({
+      target: this.contentEl,
+      props: {
+        writeQueue: this.writeQueue // NEW: Pass it as a prop to Svelte
+      }
+    });
+  }
+
+  async onClose() {
+    // Unmount Svelte. This triggers onDestroy() in App.svelte, 
+    // which cascades down to the Three.js ResourceTracker.
+    if (this.component) {
+      this.component.$destroy();
+    }
+  }
+}
+
+
+================================================
+FILE: src/engine/FrontmatterWriteQueue.ts
+================================================
+import { App, TFile } from 'obsidian';
+
+export class FrontmatterWriteQueue {
+  private app: App;
+  private queues = new Map<string, Promise<void>>();
+  private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  constructor(app: App) {
+    this.app = app;
+  }
+
+  enqueue(file: TFile, updateFn: (fm: any) => void) {
+    const path = file.path;
+
+    // 1. Clear any pending writes for this file (Debounce)
+    if (this.debounceTimers.has(path)) {
+      clearTimeout(this.debounceTimers.get(path)!);
+    }
+
+    // 2. Wait 250ms after the last slider movement before writing
+    const timer = setTimeout(() => {
+      // 3. Chain promises to ensure writes happen sequentially
+      const prev = this.queues.get(path) || Promise.resolve();
+      
+      const next = prev.then(() => 
+        this.app.fileManager.processFrontMatter(file, updateFn)
+      ).catch((e) => {
+        console.error("NE3D Write Error: ", e);
+      });
+
+      this.queues.set(path, next);
+    }, 250);
+
+    this.debounceTimers.set(path, timer);
+  }
+}
+
+
+================================================
+FILE: src/engine/Renderer3D.ts
+================================================
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { ResourceTracker } from './ResourceTracker';
+import { TimelineLayout } from './TimelineLayout';
+import { SceneNode } from './SceneStore';
+import { selectedSceneStore } from './SceneStore';
+
+/**
+ * Architecture 11.5: Renderer3D
+ * Owns Three.js scene, uses ResourceTracker, enforces event boundaries.
+ */
+export class Renderer3D {
+  private container: HTMLDivElement;
+  private scene!: THREE.Scene;
+  private camera!: THREE.PerspectiveCamera;
+  private renderer!: THREE.WebGLRenderer;
+  private controls!: OrbitControls;
+  private tracker: ResourceTracker;
+  private animationFrameId: number = 0;
+  
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+  private currentNodes: SceneNode[] =[]; // Keep track of the nodes we are rendering
+
+  // Phase 1: Layout Engine Integration
+  private layoutEngine = new TimelineLayout();
+
+  // Using InstancedMesh as per Section 15: Performance Strategy
+  private instancedMesh!: THREE.InstancedMesh;
+
+  constructor(container: HTMLDivElement) {
+    this.container = container;
+    this.tracker = new ResourceTracker();
+  }
+
+  init() {
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x1e1e1e); // Obsidian dark mode feel
+
+    this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+    this.camera.position.set(0, 5, 15);
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.container.appendChild(this.renderer.domElement);
+
+    this.setupLighting();
+    this.setupControls();
+    this.setupEventBoundaries();
+    
+    // Resize observer to handle Obsidian pane resizing dynamically
+    const resizeObserver = new ResizeObserver(() => this.resize());
+    resizeObserver.observe(this.container);
+
+    this.animate();
+  }
+
+  private setupLighting() {
+    const ambientLight = this.tracker.track(new THREE.AmbientLight(0xffffff, 0.6));
+    const dirLight = this.tracker.track(new THREE.DirectionalLight(0xffffff, 0.8));
+    dirLight.position.set(10, 20, 10);
+    this.scene.add(ambientLight);
+    this.scene.add(dirLight);
+  }
+
+  private setupControls() {
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.05;
+  }
+
+  /**
+   * Architecture 6.0: Event Boundary Management
+   * Prevents Three.js gestures from triggering Obsidian's native pane dragging/scrolling
+   */
+  private setupEventBoundaries() {
+    const canvas = this.renderer.domElement;
+
+    canvas.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false });
+    canvas.addEventListener('pointerdown', (e) => e.stopPropagation());
+    canvas.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+    canvas.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+
+    // --- NEW: RAYCASTING CLICK DETECTION ---
+    canvas.addEventListener('click', (event) => {
+      // 1. Calculate mouse position in normalized device coordinates (-1 to +1)
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      // 2. Raycast from camera
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      // 3. Check for intersections with our instanced mesh
+      if (this.instancedMesh) {
+        const intersects = this.raycaster.intersectObject(this.instancedMesh);
+        if (intersects.length > 0) {
+          // We hit a cube! Get its instance ID (0 to 69)
+          const instanceId = intersects[0].instanceId;
+          if (instanceId !== undefined) {
+            const clickedNode = this.currentNodes[instanceId];
+            console.log("Clicked Scene:", clickedNode.title);
+            
+            // Send it to the Svelte UI!
+            selectedSceneStore.set(clickedNode); 
+          }
+        } else {
+          // Clicked empty space
+          selectedSceneStore.set(null);
+        }
+      }
+    });
+
+    // Prevent scrolling from moving the whole Obsidian view
+    canvas.addEventListener('wheel', (e) => {
+      e.stopPropagation();
+    }, { passive: false });
+
+    // Prevent dragging the canvas from dragging the Obsidian pane
+    canvas.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+    });
+
+    // Touch event containment
+    canvas.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+    canvas.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+  }
+
+  /**
+   * Performance Strategy: InstancedMesh for 1000+ nodes
+   * Now driven entirely by Obsidian File Data
+   */
+  updateNodes(nodes: SceneNode[]) {
+    this.currentNodes = nodes; // Save the reference
+    const count = nodes.length;
+    console.log(`Updating ${count} nodes`);
+
+    // 1. Safely clean up the old mesh without wiping the lights out
+    if (this.instancedMesh) {
+      this.scene.remove(this.instancedMesh);
+      this.instancedMesh.geometry.dispose();
+      (this.instancedMesh.material as THREE.Material).dispose();
+      this.instancedMesh.dispose();
+    }
+
+    // 2. If there are no scene files found, just return an empty space
+    if (count === 0) return;
+
+    // 3. Compute layout matrices using the Phase 1 Data Model
+    const matrices = this.layoutEngine.compute(nodes);
+
+    // 4. Create new geometry & material and track them for the final plugin unload
+    const geometry = this.tracker.track(new THREE.BoxGeometry(0.5, 0.5, 0.5));
+    const material = this.tracker.track(new THREE.MeshStandardMaterial({ color: 0x44aadd }));
+    
+    this.instancedMesh = this.tracker.track(new THREE.InstancedMesh(geometry, material, count));
+
+    // 5. Apply the calculated timeline coordinates to each instanced block
+    for (let i = 0; i < count; i++) {
+      this.instancedMesh.setMatrixAt(i, matrices[i]);
+    }
+    
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.instancedMesh);
+  }
+
+  private resize() {
+    if (!this.container || !this.camera || !this.renderer) return;
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+  }
+
+  private animate = () => {
+    this.animationFrameId = requestAnimationFrame(this.animate);
+    this.controls.update();
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * Architecture 9.3: Hard disposal on view close
+   */
+  dispose() {
+    cancelAnimationFrame(this.animationFrameId);
+    
+    if (this.controls) this.controls.dispose();
+    this.tracker.dispose();
+    
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer.forceContextLoss();
+      if (this.container.contains(this.renderer.domElement)) {
+        this.container.removeChild(this.renderer.domElement);
+      }
+    }
+  }
+}
+
+
+================================================
+FILE: src/engine/ResourceTracker.ts
+================================================
+import * as THREE from 'three';
+
+/**
+ * Architecture 9.2: ResourceTracker Class (Mandatory)
+ * Prevents WebGL memory leaks when switching layouts or reloading plugins.
+ */
+export class ResourceTracker {
+  private resources = new Set<any>();
+
+  track<T>(resource: T): T {
+    if (!resource) return resource;
+
+    // Track Geometries, Materials, Textures, and Object3Ds
+    if (
+      (resource as any).dispose || 
+      resource instanceof THREE.Object3D
+    ) {
+      this.resources.add(resource);
+    }
+    return resource;
+  }
+
+  dispose() {
+    for (const resource of this.resources) {
+      if (resource instanceof THREE.Object3D) {
+        if (resource.parent) {
+          resource.parent.remove(resource);
+        }
+      }
+      if ((resource as any).dispose) {
+        (resource as any).dispose();
+      }
+    }
+    this.resources.clear();
+  }
+}
+
+
+================================================
+FILE: src/engine/SceneIndexer.ts
+================================================
+import { App, TFile } from 'obsidian';
+import { SceneNode, sceneStore } from './SceneStore';
+
+export class SceneIndexer {
+  private app: App;
+  private targetFolder: string; // e.g., "Scenes/" to restrict the scope
+
+  constructor(app: App, targetFolder: string = "") {
+    this.app = app;
+    this.targetFolder = targetFolder;
+  }
+
+  // Initial scan of the vault
+  public indexVault() {
+    const files = this.app.vault.getMarkdownFiles();
+    const nodes: SceneNode[] =[];
+
+    for (const file of files) {
+      if (this.targetFolder && !file.path.startsWith(this.targetFolder)) continue;
+      
+      const node = this.parseFile(file);
+      if (node) nodes.push(node);
+    }
+
+    // Update the Svelte store
+    sceneStore.set(nodes);
+  }
+
+  // Parse a single file's frontmatter into our canonical model
+  private parseFile(file: TFile): SceneNode | null {
+    // 1. Strict Folder Filter (Obsidian uses forward slashes internally)
+    if (!file.path.startsWith('02_Eras/Era_01/Summaries')) return null;
+
+    const cache = this.app.metadataCache.getFileCache(file);
+    const fm = cache?.frontmatter;
+
+    // 2. Strict Frontmatter Property Filter
+    if (fm?.note_type !== 'scene_summary') return null;
+
+    return {
+      id: file.path,
+      title: file.basename,
+      file: file,
+      storyDate: fm?.storyDate ? Number(fm.storyDate) : 0,
+      era: fm?.era ? Number(fm.era) : 1,
+      emotional: {
+        valence: fm?.valence ? Number(fm.valence) : 0,
+        intensity: fm?.intensity ? Number(fm.intensity) : 0.5,
+      }
+    };
+  }
+
+  // Listen for live updates when the user edits a markdown file
+  public registerListeners(registerEvent: (event: any) => void) {
+    registerEvent(
+      this.app.metadataCache.on('changed', (file, data, cache) => {
+        if (this.targetFolder && !file.path.startsWith(this.targetFolder)) return;
+        
+        console.log(`Live update detected on: ${file.basename}`);
+        this.indexVault(); // Simple implementation: re-index all. (Can be optimized later)
+      })
+    );
+  }
+}
+
+
+================================================
+FILE: src/engine/SceneStore.ts
+================================================
+import { writable } from 'svelte/store';
+import { TFile } from 'obsidian';
+
+// Architecture 7: Canonical Data Model
+export interface SceneNode {
+  id: string;          // File path
+  title: string;       // File basename
+  file: TFile;         // Reference to the actual Obsidian file
+  storyDate: number;   // Frontmatter: date or sequence number
+  era: number;         // Frontmatter: era
+  emotional: {
+    valence: number;   // Frontmatter: valence (-1 to 1)
+    intensity: number; // Frontmatter: intensity (0 to 1)
+  };
+}
+
+// Architecture 11.2: Central observable store
+export const sceneStore = writable<SceneNode[]>([]);
+export const selectedSceneStore = writable<SceneNode | null>(null); // NEW!
+
+
+================================================
+FILE: src/engine/TimelineLayout.ts
+================================================
+import { SceneNode } from './SceneStore';
+import * as THREE from 'three';
+
+export class TimelineLayout {
+  public compute(nodes: SceneNode[]): THREE.Matrix4[] {
+    const matrices: THREE.Matrix4[] =[];
+    const dummy = new THREE.Object3D();
+
+    // Sort nodes chronologically
+    const sortedNodes = [...nodes].sort((a, b) => a.storyDate - b.storyDate);
+
+    sortedNodes.forEach((node, index) => {
+      // X Axis: Progression of time (index or storyDate)
+      const x = index * 2.0; 
+      
+      // Y Axis: Emotional Valence (High = positive, Low = negative)
+      const y = node.emotional.valence * 5.0; 
+      
+      // Z Axis: Era or spatial separation
+      const z = node.era * -3.0;
+
+      dummy.position.set(x, y, z);
+      
+      // Scale based on emotional intensity
+      const scale = 0.5 + (node.emotional.intensity * 1.5);
+      dummy.scale.set(scale, scale, scale);
+
+      dummy.updateMatrix();
+      matrices.push(dummy.matrix.clone());
+    });
+
+    return matrices;
+  }
+}
+
+
+================================================
+FILE: src/renderer/Renderer3D.ts
+================================================
+﻿import { selectedSceneStore } from './SceneStore';
+export class Renderer3D {
+  constructor() {
+    console.log('Renderer3D initialized');
+  }
+}
+
+
+
+================================================
+FILE: src/ui/App.svelte
+================================================
+<script lang="ts">
+  import { onMount, onDestroy } from 'svelte';
+  import { Renderer3D } from '../engine/Renderer3D';
+  import { sceneStore, selectedSceneStore } from '../engine/SceneStore';
+  import InspectorPanel from './InspectorPanel.svelte'; // NEW
+  import type { FrontmatterWriteQueue } from '../engine/FrontmatterWriteQueue'; // NEW
+
+  export let writeQueue: FrontmatterWriteQueue; // NEW: Receive prop from View
+
+  let container: HTMLDivElement;
+  let renderer: Renderer3D;
+
+  onMount(() => {
+    renderer = new Renderer3D(container);
+    renderer.init();
+    renderer.updateNodes($sceneStore);
+  });
+
+  onDestroy(() => {
+    if (renderer) renderer.dispose();
+  });
+
+  $: if (renderer && $sceneStore) {
+    renderer.updateNodes($sceneStore);
+  }
+</script>
+
+<div class="ne3d-wrapper">
+  <div class="ne3d-toolbar">
+    <div class="ne3d-title">Narrative Engine 3D</div>
+    <div class="ne3d-controls">
+      <label>Scenes tracked: {$sceneStore.length}</label>
+      <span style="margin-left: 20px; color: var(--text-accent);">
+        {#if $selectedSceneStore}
+          Selected: {$selectedSceneStore.title}
+        {:else}
+          Click a scene...
+        {/if}
+      </span>
+    </div>
+  </div>
+
+  <!-- NEW: Flex container to hold Canvas and Inspector side-by-side -->
+  <div class="ne3d-workspace">
+    <div bind:this={container} class="ne3d-canvas-container" style="touch-action: none;"></div>
+    
+    <!-- Mount the Inspector and pass it the writeQueue -->
+    <InspectorPanel writeQueue={writeQueue} />
+  </div>
+</div>
+
+<style>
+  .ne3d-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+  }
+  .ne3d-toolbar {
+    padding: 10px;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .ne3d-title {
+    font-weight: bold;
+    color: var(--text-normal);
+  }
+  
+  /* NEW CSS */
+  .ne3d-workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .ne3d-canvas-container {
+    flex: 1;
+    position: relative;
+    height: 100%;
+  }
+</style>
+
+
+================================================
+FILE: src/ui/InspectorPanel.svelte
+================================================
+<script lang="ts">
+  import { selectedSceneStore } from '../engine/SceneStore';
+  import type { FrontmatterWriteQueue } from '../engine/FrontmatterWriteQueue';
+
+  export let writeQueue: FrontmatterWriteQueue;
+
+  // When a slider moves, optimistically update the UI, then queue the disk write
+  function handleValence(e: Event) {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    if ($selectedSceneStore) {
+      $selectedSceneStore.emotional.valence = val; 
+      writeQueue.enqueue($selectedSceneStore.file, (fm) => { fm.valence = val; });
+    }
+  }
+
+  function handleIntensity(e: Event) {
+    const val = parseFloat((e.target as HTMLInputElement).value);
+    if ($selectedSceneStore) {
+      $selectedSceneStore.emotional.intensity = val;
+      writeQueue.enqueue($selectedSceneStore.file, (fm) => { fm.intensity = val; });
+    }
+  }
+</script>
+
+<div class="ne3d-inspector">
+  {#if $selectedSceneStore}
+    <div class="inspector-header">
+      <h3>{$selectedSceneStore.title}</h3>
+      <p class="file-path">{$selectedSceneStore.id}</p>
+    </div>
+    
+    <div class="slider-group">
+      <label>Valence (Positive/Negative): {$selectedSceneStore.emotional.valence.toFixed(2)}</label>
+      <input type="range" min="-1" max="1" step="0.1" 
+             value={$selectedSceneStore.emotional.valence} 
+             on:input={handleValence} />
+    </div>
+
+    <div class="slider-group">
+      <label>Intensity (Low/High): {$selectedSceneStore.emotional.intensity.toFixed(2)}</label>
+      <input type="range" min="0" max="1" step="0.1" 
+             value={$selectedSceneStore.emotional.intensity} 
+             on:input={handleIntensity} />
+    </div>
+  {:else}
+    <div class="empty-state">
+      <p>Click a cube in the 3D canvas to inspect its properties.</p>
+    </div>
+  {/if}
+</div>
+
+<style>
+  .ne3d-inspector {
+    width: 300px;
+    background-color: var(--background-secondary-alt);
+    border-left: 1px solid var(--background-modifier-border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    overflow-y: auto;
+  }
+  .inspector-header h3 {
+    margin: 0 0 5px 0;
+    color: var(--text-normal);
+  }
+  .file-path {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin: 0;
+    word-break: break-all;
+  }
+  .slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    color: var(--text-muted);
+  }
+  input[type=range] {
+    width: 100%;
+    cursor: pointer;
+  }
+  .empty-state {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: var(--text-faint);
   }
 </style>
 

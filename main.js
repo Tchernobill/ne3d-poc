@@ -21413,6 +21413,8 @@ var Renderer3D = class {
       return;
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
+    if (width === 0 || height === 0)
+      return;
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
@@ -21467,7 +21469,7 @@ function create_if_block(ctx) {
   );
   let t0;
   let t1;
-  let p;
+  let p0;
   let t2_value = (
     /*$selectedSceneStore*/
     ctx[0].id + ""
@@ -21475,7 +21477,7 @@ function create_if_block(ctx) {
   let t2;
   let t3;
   let div1;
-  let label0;
+  let p1;
   let t4;
   let t5_value = (
     /*$selectedSceneStore*/
@@ -21487,7 +21489,7 @@ function create_if_block(ctx) {
   let input0_value_value;
   let t7;
   let div2;
-  let label1;
+  let p2;
   let t8;
   let t9_value = (
     /*$selectedSceneStore*/
@@ -21505,24 +21507,24 @@ function create_if_block(ctx) {
       h3 = element("h3");
       t0 = text(t0_value);
       t1 = space();
-      p = element("p");
+      p0 = element("p");
       t2 = text(t2_value);
       t3 = space();
       div1 = element("div");
-      label0 = element("label");
+      p1 = element("p");
       t4 = text("Valence (Positive/Negative): ");
       t5 = text(t5_value);
       t6 = space();
       input0 = element("input");
       t7 = space();
       div2 = element("div");
-      label1 = element("label");
+      p2 = element("p");
       t8 = text("Intensity (Low/High): ");
       t9 = text(t9_value);
       t10 = space();
       input1 = element("input");
       attr(h3, "class", "svelte-o40b4b");
-      attr(p, "class", "file-path svelte-o40b4b");
+      attr(p0, "class", "file-path svelte-o40b4b");
       attr(div0, "class", "inspector-header svelte-o40b4b");
       attr(input0, "type", "range");
       attr(input0, "min", "-1");
@@ -21546,20 +21548,20 @@ function create_if_block(ctx) {
       append(div0, h3);
       append(h3, t0);
       append(div0, t1);
-      append(div0, p);
-      append(p, t2);
+      append(div0, p0);
+      append(p0, t2);
       insert(target, t3, anchor);
       insert(target, div1, anchor);
-      append(div1, label0);
-      append(label0, t4);
-      append(label0, t5);
+      append(div1, p1);
+      append(p1, t4);
+      append(p1, t5);
       append(div1, t6);
       append(div1, input0);
       insert(target, t7, anchor);
       insert(target, div2, anchor);
-      append(div2, label1);
-      append(label1, t8);
-      append(label1, t9);
+      append(div2, p2);
+      append(p2, t8);
+      append(p2, t9);
       append(div2, t10);
       append(div2, input1);
       if (!mounted) {
@@ -21758,7 +21760,7 @@ function create_fragment2(ctx) {
   let div0;
   let t1;
   let div1;
-  let label;
+  let p;
   let t2;
   let t3_value = (
     /*$sceneStore*/
@@ -21797,7 +21799,7 @@ function create_fragment2(ctx) {
       div0.textContent = "Narrative Engine 3D";
       t1 = space();
       div1 = element("div");
-      label = element("label");
+      p = element("p");
       t2 = text("Scenes tracked: ");
       t3 = text(t3_value);
       t4 = space();
@@ -21824,9 +21826,9 @@ function create_fragment2(ctx) {
       append(div2, div0);
       append(div2, t1);
       append(div2, div1);
-      append(div1, label);
-      append(label, t2);
-      append(label, t3);
+      append(div1, p);
+      append(p, t2);
+      append(p, t3);
       append(div1, t4);
       append(div1, span);
       if_block.m(span, null);
