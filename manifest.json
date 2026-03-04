@@ -1,6 +1,6 @@
-﻿{
+{
   "id": "ne3d-poc",
-  "name": "arrative Engine 3D (PoC)",
+  "name": "Narrative Engine 3D (PoC)",
   "version": "0.1.0",
   "minAppVersion": "1.4.0",
   "description": "3D Narrative Engine Plugin",

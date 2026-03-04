@@ -28,7 +28,6 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
-    "@three-ts/orbit-controls": "^1.4.0",
     "three": "^0.160.0"
   }
 }

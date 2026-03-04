@@ -1,43 +1,52 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Renderer3D } from '../engine/Renderer3D';
+  import { sceneStore, selectedSceneStore } from '../engine/SceneStore';
+  import InspectorPanel from './InspectorPanel.svelte'; // NEW
+  import type { FrontmatterWriteQueue } from '../engine/FrontmatterWriteQueue'; // NEW
+
+  export let writeQueue: FrontmatterWriteQueue; // NEW: Receive prop from View
 
   let container: HTMLDivElement;
   let renderer: Renderer3D;
-  let sceneCount = 500; // Testing scalable requirement
 
-  // Architecture 5.2: UI Layer completely separated from rendering logic
   onMount(() => {
     renderer = new Renderer3D(container);
     renderer.init();
-    renderer.updateNodes(sceneCount);
+    renderer.updateNodes($sceneStore);
   });
 
   onDestroy(() => {
-    // Architecture 9.3: Lifecycle Integration / Hard disposal
-    if (renderer) {
-      renderer.dispose();
-    }
+    if (renderer) renderer.dispose();
   });
 
-  function handleSliderChange() {
-    renderer.updateNodes(sceneCount);
+  $: if (renderer && $sceneStore) {
+    renderer.updateNodes($sceneStore);
   }
 </script>
 
 <div class="ne3d-wrapper">
-  <!-- UI Layer: Toolbar / Inspector (Vanilla Svelte, completely reactive) -->
   <div class="ne3d-toolbar">
     <div class="ne3d-title">Narrative Engine 3D</div>
     <div class="ne3d-controls">
-      <label>Scenes: {sceneCount}</label>
-      <input type="range" min="10" max="1000" bind:value={sceneCount} on:input={handleSliderChange} />
+      <label>Scenes tracked: {$sceneStore.length}</label>
+      <span style="margin-left: 20px; color: var(--text-accent);">
+        {#if $selectedSceneStore}
+          Selected: {$selectedSceneStore.title}
+        {:else}
+          Click a scene...
+        {/if}
+      </span>
     </div>
   </div>
 
-  <!-- 3D Viewport container -->
-  <!-- touch-action: none is critical for preventing trackpad swipe pane conflicts -->
-  <div bind:this={container} class="ne3d-canvas-container" style="touch-action: none;"></div>
+  <!-- NEW: Flex container to hold Canvas and Inspector side-by-side -->
+  <div class="ne3d-workspace">
+    <div bind:this={container} class="ne3d-canvas-container" style="touch-action: none;"></div>
+    
+    <!-- Mount the Inspector and pass it the writeQueue -->
+    <InspectorPanel writeQueue={writeQueue} />
+  </div>
 </div>
 
 <style>
@@ -60,10 +69,16 @@
     font-weight: bold;
     color: var(--text-normal);
   }
+  
+  /* NEW CSS */
+  .ne3d-workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
   .ne3d-canvas-container {
     flex: 1;
     position: relative;
-    width: 100%;
     height: 100%;
   }
 </style>

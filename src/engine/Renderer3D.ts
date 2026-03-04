@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ResourceTracker } from './ResourceTracker';
+import { TimelineLayout } from './TimelineLayout';
+import { SceneNode } from './SceneStore';
+import { selectedSceneStore } from './SceneStore';
 
 /**
  * Architecture 11.5: Renderer3D
@@ -15,6 +18,13 @@ export class Renderer3D {
   private tracker: ResourceTracker;
   private animationFrameId: number = 0;
   
+  private raycaster = new THREE.Raycaster();
+  private mouse = new THREE.Vector2();
+  private currentNodes: SceneNode[] =[]; // Keep track of the nodes we are rendering
+
+  // Phase 1: Layout Engine Integration
+  private layoutEngine = new TimelineLayout();
+
   // Using InstancedMesh as per Section 15: Performance Strategy
   private instancedMesh!: THREE.InstancedMesh;
 
@@ -31,7 +41,7 @@ export class Renderer3D {
     this.scene.background = new THREE.Color(0x1e1e1e); // Obsidian dark mode feel
 
     this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    this.camera.position.set(0, 10, 20);
+    this.camera.position.set(0, 5, 15);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(width, height);
@@ -70,6 +80,41 @@ export class Renderer3D {
   private setupEventBoundaries() {
     const canvas = this.renderer.domElement;
 
+    canvas.addEventListener('wheel', (e) => e.stopPropagation(), { passive: false });
+    canvas.addEventListener('pointerdown', (e) => e.stopPropagation());
+    canvas.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
+    canvas.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
+
+    // --- NEW: RAYCASTING CLICK DETECTION ---
+    canvas.addEventListener('click', (event) => {
+      // 1. Calculate mouse position in normalized device coordinates (-1 to +1)
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+      // 2. Raycast from camera
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      // 3. Check for intersections with our instanced mesh
+      if (this.instancedMesh) {
+        const intersects = this.raycaster.intersectObject(this.instancedMesh);
+        if (intersects.length > 0) {
+          // We hit a cube! Get its instance ID (0 to 69)
+          const instanceId = intersects[0].instanceId;
+          if (instanceId !== undefined) {
+            const clickedNode = this.currentNodes[instanceId];
+            console.log("Clicked Scene:", clickedNode.title);
+            
+            // Send it to the Svelte UI!
+            selectedSceneStore.set(clickedNode); 
+          }
+        } else {
+          // Clicked empty space
+          selectedSceneStore.set(null);
+        }
+      }
+    });
+
     // Prevent scrolling from moving the whole Obsidian view
     canvas.addEventListener('wheel', (e) => {
       e.stopPropagation();
@@ -87,29 +132,36 @@ export class Renderer3D {
 
   /**
    * Performance Strategy: InstancedMesh for 1000+ nodes
+   * Now driven entirely by Obsidian File Data
    */
-  updateNodes(count: number) {
+  updateNodes(nodes: SceneNode[]) {
+    this.currentNodes = nodes; // Save the reference
+    const count = nodes.length;
+    console.log(`Updating ${count} nodes`);
+
+    // 1. Safely clean up the old mesh without wiping the lights out
     if (this.instancedMesh) {
       this.scene.remove(this.instancedMesh);
-      this.tracker.dispose(); // Cleans up previous geometry/materials
+      this.instancedMesh.geometry.dispose();
+      (this.instancedMesh.material as THREE.Material).dispose();
+      this.instancedMesh.dispose();
     }
 
+    // 2. If there are no scene files found, just return an empty space
+    if (count === 0) return;
+
+    // 3. Compute layout matrices using the Phase 1 Data Model
+    const matrices = this.layoutEngine.compute(nodes);
+
+    // 4. Create new geometry & material and track them for the final plugin unload
     const geometry = this.tracker.track(new THREE.BoxGeometry(0.5, 0.5, 0.5));
     const material = this.tracker.track(new THREE.MeshStandardMaterial({ color: 0x44aadd }));
     
     this.instancedMesh = this.tracker.track(new THREE.InstancedMesh(geometry, material, count));
 
-    const dummy = new THREE.Object3D();
+    // 5. Apply the calculated timeline coordinates to each instanced block
     for (let i = 0; i < count; i++) {
-      // Create a random mock layout along a timeline axis
-      dummy.position.set(
-        (Math.random() - 0.5) * 40,
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 10
-      );
-      dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      dummy.updateMatrix();
-      this.instancedMesh.setMatrixAt(i, dummy.matrix);
+      this.instancedMesh.setMatrixAt(i, matrices[i]);
     }
     
     this.instancedMesh.instanceMatrix.needsUpdate = true;

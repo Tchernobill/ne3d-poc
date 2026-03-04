@@ -1,4 +1,5 @@
-﻿export class Renderer3D {
+﻿import { selectedSceneStore } from './SceneStore';
+export class Renderer3D {
   constructor() {
     console.log('Renderer3D initialized');
   }
