@@ -1,0 +1,252 @@
+Directory structure:
+└── tchernobill-ne3d-poc/
+    ├── README.md
+    ├── build-release.mjs
+    ├── esbuild.config.mjs
+    ├── LICENSE
+    ├── main.js
+    ├── main.ts
+    ├── manifest.json
+    ├── package.json
+    ├── styles.css
+    ├── tsconfig.json
+    ├── .eslintrc.cjs
+    ├── .prettierrc
+    ├── src/
+    │   ├── renderer/
+    │   │   └── Renderer3D.ts
+    │   └── view/
+    │       └── NE3DView.ts
+    └── types/
+        └── obsidian.d.ts
+
+================================================
+FILE: README.md
+================================================
+# ne3d-poc
+
+3D Narrative Engine Plugin for Obsidian.
+
+## Development
+npm install
+npm run watch
+
+## Build
+npm run build
+
+## Release
+npm run release
+
+
+
+================================================
+FILE: build-release.mjs
+================================================
+import { execSync } from 'child_process';
+import fs from 'fs';
+
+const manifest = JSON.parse(fs.readFileSync('manifest.json'));
+const version = manifest.version;
+const zipName = manifest.id + '-' + version + '.zip';
+
+execSync('tar -a -c -f ' + zipName + ' manifest.json main.js styles.css', { stdio: 'inherit' });
+
+console.log('Release built:', zipName);
+
+
+
+================================================
+FILE: esbuild.config.mjs
+================================================
+import esbuild from 'esbuild';
+
+const mode = process.argv[2];
+const production = mode === 'production';
+const watch = mode === 'watch';
+
+const ctx = await esbuild.context({
+  entryPoints: ['main.ts'],
+  bundle: true,
+  outfile: 'main.js',
+  format: 'cjs',
+  external: ['obsidian'],
+  sourcemap: !production,
+  minify: production,
+  target: 'es2018'
+});
+
+if (watch) {
+  await ctx.watch();
+  console.log('Watching...');
+} else {
+  await ctx.rebuild();
+  await ctx.dispose();
+}
+
+
+
+================================================
+FILE: LICENSE
+================================================
+MIT License
+
+Copyright (c) 2026
+
+Permission is hereby granted, free of charge...
+
+
+
+================================================
+FILE: main.js
+================================================
+"use strict";var a=Object.defineProperty;var c=Object.getOwnPropertyDescriptor;var g=Object.getOwnPropertyNames;var i=Object.prototype.hasOwnProperty;var r=(l,o)=>{for(var n in o)a(l,n,{get:o[n],enumerable:!0})},u=(l,o,n,s)=>{if(o&&typeof o=="object"||typeof o=="function")for(let e of g(o))!i.call(l,e)&&e!==n&&a(l,e,{get:()=>o[e],enumerable:!(s=c(o,e))||s.enumerable});return l};var f=l=>u(a({},"__esModule",{value:!0}),l);var m={};r(m,{default:()=>d});module.exports=f(m);var t=require("obsidian"),d=class extends t.Plugin{async onload(){console.log("Plugin loaded")}};
+
+
+
+================================================
+FILE: main.ts
+================================================
+import { Plugin } from 'obsidian';
+
+export default class Ne3dPoc extends Plugin {
+  async onload() {
+    console.log('Plugin loaded');
+  }
+}
+
+
+
+================================================
+FILE: manifest.json
+================================================
+{
+  "id": "ne3d-poc",
+  "name": "ne3d-poc",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "3D Narrative Engine Plugin",
+  "author": "Your Name",
+  "isDesktopOnly": true
+}
+
+
+
+================================================
+FILE: package.json
+================================================
+{
+  "name": "ne3d-poc",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs watch",
+    "build": "node esbuild.config.mjs production",
+    "lint": "eslint . --ext .ts",
+    "format": "prettier --write .",
+    "release": "node build-release.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/three": "^0.160.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "prettier": "^3.0.0"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "@three-ts/orbit-controls": "^1.4.0"
+  }
+}
+
+
+
+================================================
+FILE: styles.css
+================================================
+[Empty file]
+
+
+================================================
+FILE: tsconfig.json
+================================================
+{
+  "compilerOptions": {
+    "target": "ES6",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "typeRoots": ["types", "node_modules/@types"]
+  },
+  "include": ["src", "main.ts", "types"]
+}
+
+
+
+================================================
+FILE: .eslintrc.cjs
+================================================
+module.exports = {
+  parser: '@typescript-eslint/parser',
+  plugins: ['@typescript-eslint'],
+  extends: ['eslint:recommended', 'plugin:@typescript-eslint/recommended'],
+  env: { node: true, es2021: true }
+};
+
+
+
+================================================
+FILE: .prettierrc
+================================================
+{
+  "semi": true,
+  "singleQuote": true
+}
+
+
+
+================================================
+FILE: src/renderer/Renderer3D.ts
+================================================
+export class Renderer3D {
+  constructor() {
+    console.log('Renderer3D initialized');
+  }
+}
+
+
+
+================================================
+FILE: src/view/NE3DView.ts
+================================================
+export class NE3DView {
+  constructor() {
+    console.log('NE3DView initialized');
+  }
+}
+
+
+
+================================================
+FILE: types/obsidian.d.ts
+================================================
+declare module 'obsidian' {
+    export interface Plugin {
+        onload(): void;
+        onunload(): void;
+        [key: string]: any;
+    }
+    export class Plugin {
+        async onload(): Promise<void> {}
+        async onunload(): Promise<void> {}
+    }
+    export interface WorkspaceLeaf { [key: string]: any }
+    export interface TFile { [key: string]: any }
+}
+
+

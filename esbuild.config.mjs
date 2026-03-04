@@ -1,24 +1,38 @@
-﻿import esbuild from 'esbuild';
+﻿// esbuild.config.mjs
+import esbuild from "esbuild";
+import process from "process";
+import builtins from "builtin-modules";
+import esbuildSvelte from "esbuild-svelte";
+import sveltePreprocess from "svelte-preprocess";
 
-const mode = process.argv[2];
-const production = mode === 'production';
-const watch = mode === 'watch';
+const prod = (process.argv[2] === "production");
 
-const ctx = await esbuild.context({
-  entryPoints: ['main.ts'],
+const context = await esbuild.context({
+  banner: { js: "/* NE3D Proof of Concept */" },
+  entryPoints: ["src/main.ts"],
   bundle: true,
-  outfile: 'main.js',
-  format: 'cjs',
-  external: ['obsidian'],
-  sourcemap: !production,
-  minify: production,
-  target: 'es2018'
+  external:[
+    "obsidian",
+    "electron",
+    ...builtins
+  ],
+  format: "cjs",
+  target: "es2018",
+  logLevel: "info",
+  sourcemap: prod ? false : "inline",
+  treeShaking: true,
+  outfile: "main.js",
+  plugins:[
+    esbuildSvelte({
+      compilerOptions: { css: "injected" }, // Injects Svelte CSS directly into the JS bundle
+      preprocess: sveltePreprocess(),
+    }),
+  ],
 });
 
-if (watch) {
-  await ctx.watch();
-  console.log('Watching...');
+if (prod) {
+  await context.rebuild();
+  process.exit(0);
 } else {
-  await ctx.rebuild();
-  await ctx.dispose();
+  await context.watch();
 }
