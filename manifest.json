@@ -1,0 +1,9 @@
+﻿{
+  "id": "ne3d-poc",
+  "name": "ne3d-poc",
+  "version": "0.1.0",
+  "minAppVersion": "1.4.0",
+  "description": "3D Narrative Engine Plugin",
+  "author": "Your Name",
+  "isDesktopOnly": true
+}
