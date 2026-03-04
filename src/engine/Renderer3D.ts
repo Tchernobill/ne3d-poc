@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { ResourceTracker } from './ResourceTracker';
+import { TimelineLayout } from './TimelineLayout';
+import { SceneNode } from './SceneStore';
 
 /**
  * Architecture 11.5: Renderer3D
@@ -15,6 +17,9 @@ export class Renderer3D {
   private tracker: ResourceTracker;
   private animationFrameId: number = 0;
   
+  // Phase 1: Layout Engine Integration
+  private layoutEngine = new TimelineLayout();
+
   // Using InstancedMesh as per Section 15: Performance Strategy
   private instancedMesh!: THREE.InstancedMesh;
 
@@ -31,7 +36,7 @@ export class Renderer3D {
     this.scene.background = new THREE.Color(0x1e1e1e); // Obsidian dark mode feel
 
     this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    this.camera.position.set(0, 10, 20);
+    this.camera.position.set(0, 5, 15);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(width, height);
@@ -87,29 +92,34 @@ export class Renderer3D {
 
   /**
    * Performance Strategy: InstancedMesh for 1000+ nodes
+   * Now driven entirely by Obsidian File Data
    */
-  updateNodes(count: number) {
+  updateNodes(nodes: SceneNode[]) {
+    const count = nodes.length;
+
+    // 1. Safely clean up the old mesh without wiping the lights out
     if (this.instancedMesh) {
       this.scene.remove(this.instancedMesh);
-      this.tracker.dispose(); // Cleans up previous geometry/materials
+      this.instancedMesh.geometry.dispose();
+      (this.instancedMesh.material as THREE.Material).dispose();
+      this.instancedMesh.dispose();
     }
 
+    // 2. If there are no scene files found, just return an empty space
+    if (count === 0) return;
+
+    // 3. Compute layout matrices using the Phase 1 Data Model
+    const matrices = this.layoutEngine.compute(nodes);
+
+    // 4. Create new geometry & material and track them for the final plugin unload
     const geometry = this.tracker.track(new THREE.BoxGeometry(0.5, 0.5, 0.5));
     const material = this.tracker.track(new THREE.MeshStandardMaterial({ color: 0x44aadd }));
     
     this.instancedMesh = this.tracker.track(new THREE.InstancedMesh(geometry, material, count));
 
-    const dummy = new THREE.Object3D();
+    // 5. Apply the calculated timeline coordinates to each instanced block
     for (let i = 0; i < count; i++) {
-      // Create a random mock layout along a timeline axis
-      dummy.position.set(
-        (Math.random() - 0.5) * 40,
-        (Math.random() - 0.5) * 10,
-        (Math.random() - 0.5) * 10
-      );
-      dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
-      dummy.updateMatrix();
-      this.instancedMesh.setMatrixAt(i, dummy.matrix);
+      this.instancedMesh.setMatrixAt(i, matrices[i]);
     }
     
     this.instancedMesh.instanceMatrix.needsUpdate = true;

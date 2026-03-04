@@ -16,6 +16,7 @@ const context = await esbuild.context({
     "electron",
     ...builtins
   ],
+   platform: "browser",
   format: "cjs",
   target: "es2018",
   logLevel: "info",

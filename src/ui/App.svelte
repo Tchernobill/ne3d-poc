@@ -1,42 +1,36 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Renderer3D } from '../engine/Renderer3D';
+  import { sceneStore } from '../engine/SceneStore';
 
   let container: HTMLDivElement;
   let renderer: Renderer3D;
-  let sceneCount = 500; // Testing scalable requirement
 
-  // Architecture 5.2: UI Layer completely separated from rendering logic
   onMount(() => {
     renderer = new Renderer3D(container);
     renderer.init();
-    renderer.updateNodes(sceneCount);
+    renderer.updateNodes($sceneStore);
   });
 
   onDestroy(() => {
-    // Architecture 9.3: Lifecycle Integration / Hard disposal
-    if (renderer) {
-      renderer.dispose();
-    }
+    if (renderer) renderer.dispose();
   });
 
-  function handleSliderChange() {
-    renderer.updateNodes(sceneCount);
+  // MAGIC: This Svelte reactive statement watches the Obsidian vault.
+  // Anytime a markdown file is edited, it pushes the new data to the 3D engine!
+  $: if (renderer && $sceneStore) {
+    renderer.updateNodes($sceneStore);
   }
 </script>
 
 <div class="ne3d-wrapper">
-  <!-- UI Layer: Toolbar / Inspector (Vanilla Svelte, completely reactive) -->
   <div class="ne3d-toolbar">
     <div class="ne3d-title">Narrative Engine 3D</div>
     <div class="ne3d-controls">
-      <label>Scenes: {sceneCount}</label>
-      <input type="range" min="10" max="1000" bind:value={sceneCount} on:input={handleSliderChange} />
+      <label>Scenes tracked: {$sceneStore.length}</label>
     </div>
   </div>
 
-  <!-- 3D Viewport container -->
-  <!-- touch-action: none is critical for preventing trackpad swipe pane conflicts -->
   <div bind:this={container} class="ne3d-canvas-container" style="touch-action: none;"></div>
 </div>
 

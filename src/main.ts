@@ -1,19 +1,31 @@
 ﻿import { Plugin, WorkspaceLeaf } from 'obsidian';
 import { NE3DView, VIEW_TYPE_NE3D } from './NE3DView';
+import { SceneIndexer } from './engine/SceneIndexer';
 
 export default class NE3DPlugin extends Plugin {
-  async onload() {
-    // 1. Register the custom ItemView
-    this.registerView(VIEW_TYPE_NE3D, (leaf) => new NE3DView(leaf));
+  public indexer!: SceneIndexer;
 
-    // 2. Add a ribbon icon to open the 3D Canvas
+  async onload() {
+    // 1. Initialize the Data Layer
+    this.indexer = new SceneIndexer(this.app);
+    
+    // Wait for Obsidian to finish indexing its metadata cache on startup
+    this.app.workspace.onLayoutReady(() => {
+      this.indexer.indexVault();
+      // Bind the listener so the visualizer updates when you type
+      this.indexer.registerListeners(this.registerEvent.bind(this));
+    });
+
+    // 2. Register the custom ItemView
+    this.registerView(VIEW_TYPE_NE3D, (leaf: WorkspaceLeaf) => new NE3DView(leaf));
+
+    // 3. Add a ribbon icon to open the 3D Canvas
     this.addRibbonIcon('box', 'Open NE3D Canvas', () => {
       this.activateView();
     });
   }
 
-  onunload() {
-    // Ensure all views are closed to trigger ResourceTracker disposal
+    async onunload() {
     this.app.workspace.detachLeavesOfType(VIEW_TYPE_NE3D);
   }
 
