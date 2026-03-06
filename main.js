@@ -68,6 +68,10 @@ function subscribe(store, ...callbacks) {
 function component_subscribe(component, store, callback) {
   component.$$.on_destroy.push(subscribe(store, callback));
 }
+function set_store_value(store, ret, value) {
+  store.set(value);
+  return ret;
+}
 
 // node_modules/svelte/src/runtime/internal/globals.js
 var globals = typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : (
@@ -180,6 +184,10 @@ function text(data) {
 }
 function space() {
   return text(" ");
+}
+function listen(node, event, handler, options) {
+  node.addEventListener(event, handler, options);
+  return () => node.removeEventListener(event, handler, options);
 }
 function attr(node, attribute, value) {
   if (value == null)
@@ -309,10 +317,29 @@ function flush_render_callbacks(fns) {
 
 // node_modules/svelte/src/runtime/internal/transitions.js
 var outroing = /* @__PURE__ */ new Set();
+var outros;
 function transition_in(block, local) {
   if (block && block.i) {
     outroing.delete(block);
     block.i(local);
+  }
+}
+function transition_out(block, local, detach2, callback) {
+  if (block && block.o) {
+    if (outroing.has(block))
+      return;
+    outroing.add(block);
+    outros.c.push(() => {
+      outroing.delete(block);
+      if (callback) {
+        if (detach2)
+          block.d(1);
+        callback();
+      }
+    });
+    block.o(local);
+  } else if (callback) {
+    callback();
   }
 }
 
@@ -350,6 +377,9 @@ var _boolean_attributes = (
 var boolean_attributes = /* @__PURE__ */ new Set([..._boolean_attributes]);
 
 // node_modules/svelte/src/runtime/internal/Component.js
+function create_component(block) {
+  block && block.c();
+}
 function mount_component(component, target, anchor) {
   const { fragment: fragment2, after_update } = component.$$;
   fragment2 && fragment2.m(target, anchor);
@@ -382,7 +412,7 @@ function make_dirty(component, i) {
   }
   component.$$.dirty[i / 31 | 0] |= 1 << i % 31;
 }
-function init(component, options, instance2, create_fragment2, not_equal, props, append_styles2 = null, dirty = [-1]) {
+function init(component, options, instance3, create_fragment3, not_equal, props, append_styles2 = null, dirty = [-1]) {
   const parent_component = current_component;
   set_current_component(component);
   const $$ = component.$$ = {
@@ -408,7 +438,7 @@ function init(component, options, instance2, create_fragment2, not_equal, props,
   };
   append_styles2 && append_styles2($$.root);
   let ready = false;
-  $$.ctx = instance2 ? instance2(component, options.props || {}, (i, ret, ...rest) => {
+  $$.ctx = instance3 ? instance3(component, options.props || {}, (i, ret, ...rest) => {
     const value = rest.length ? rest[0] : ret;
     if ($$.ctx && not_equal($$.ctx[i], $$.ctx[i] = value)) {
       if (!$$.skip_bound && $$.bound[i])
@@ -421,7 +451,7 @@ function init(component, options, instance2, create_fragment2, not_equal, props,
   $$.update();
   ready = true;
   run_all($$.before_update);
-  $$.fragment = create_fragment2 ? create_fragment2($$.ctx) : false;
+  $$.fragment = create_fragment3 ? create_fragment3($$.ctx) : false;
   if (options.target) {
     if (options.hydrate) {
       start_hydrating();
@@ -20276,6 +20306,64 @@ PropertyBinding.prototype.SetterByBindingTypeAndVersioning = [
   ]
 ];
 var _controlInterpolantsResultBuffer = new Float32Array(1);
+var Raycaster = class {
+  constructor(origin, direction, near = 0, far = Infinity) {
+    this.ray = new Ray(origin, direction);
+    this.near = near;
+    this.far = far;
+    this.camera = null;
+    this.layers = new Layers();
+    this.params = {
+      Mesh: {},
+      Line: { threshold: 1 },
+      LOD: {},
+      Points: { threshold: 1 },
+      Sprite: {}
+    };
+  }
+  set(origin, direction) {
+    this.ray.set(origin, direction);
+  }
+  setFromCamera(coords, camera) {
+    if (camera.isPerspectiveCamera) {
+      this.ray.origin.setFromMatrixPosition(camera.matrixWorld);
+      this.ray.direction.set(coords.x, coords.y, 0.5).unproject(camera).sub(this.ray.origin).normalize();
+      this.camera = camera;
+    } else if (camera.isOrthographicCamera) {
+      this.ray.origin.set(coords.x, coords.y, (camera.near + camera.far) / (camera.near - camera.far)).unproject(camera);
+      this.ray.direction.set(0, 0, -1).transformDirection(camera.matrixWorld);
+      this.camera = camera;
+    } else {
+      console.error("THREE.Raycaster: Unsupported camera type: " + camera.type);
+    }
+  }
+  intersectObject(object, recursive = true, intersects = []) {
+    intersectObject(object, this, intersects, recursive);
+    intersects.sort(ascSort);
+    return intersects;
+  }
+  intersectObjects(objects, recursive = true, intersects = []) {
+    for (let i = 0, l = objects.length; i < l; i++) {
+      intersectObject(objects[i], this, intersects, recursive);
+    }
+    intersects.sort(ascSort);
+    return intersects;
+  }
+};
+function ascSort(a, b) {
+  return a.distance - b.distance;
+}
+function intersectObject(object, raycaster, intersects, recursive) {
+  if (object.layers.test(raycaster.layers)) {
+    object.raycast(raycaster, intersects);
+  }
+  if (recursive === true) {
+    const children2 = object.children;
+    for (let i = 0, l = children2.length; i < l; i++) {
+      intersectObject(children2[i], raycaster, intersects, true);
+    }
+  }
+}
 var Spherical = class {
   constructor(radius = 1, phi = 0, theta = 0) {
     this.radius = radius;
@@ -21143,13 +21231,20 @@ var ResourceTracker = class {
 
 // src/engine/TimelineLayout.ts
 var TimelineLayout = class {
-  compute(nodes) {
+  compute(nodes, minDate, maxDate) {
     const matrices = [];
     const dummy = new Object3D();
-    const sortedNodes = [...nodes].sort((a, b) => a.storyDate - b.storyDate);
-    sortedNodes.forEach((node, index) => {
-      const x = index * 2;
-      const y = node.emotional.valence * 5;
+    const timelineHeight = Math.max(nodes.length * 3, 10);
+    const dateRange = maxDate - minDate;
+    nodes.forEach((node) => {
+      let y = 0;
+      if (dateRange > 0) {
+        const proportion = (node.storyDate - minDate) / dateRange;
+        y = proportion * timelineHeight;
+      } else {
+        y = timelineHeight / 2;
+      }
+      const x = node.emotional.valence * 5;
       const z = node.era * -3;
       dummy.position.set(x, y, z);
       const scale = 0.5 + node.emotional.intensity * 1.5;
@@ -21157,117 +21252,10 @@ var TimelineLayout = class {
       dummy.updateMatrix();
       matrices.push(dummy.matrix.clone());
     });
-    return matrices;
-  }
-};
-
-// src/engine/Renderer3D.ts
-var Renderer3D = class {
-  constructor(container) {
-    this.animationFrameId = 0;
-    // Phase 1: Layout Engine Integration
-    this.layoutEngine = new TimelineLayout();
-    this.animate = () => {
-      this.animationFrameId = requestAnimationFrame(this.animate);
-      this.controls.update();
-      this.renderer.render(this.scene, this.camera);
+    return {
+      matrices,
+      bounds: { minY: 0, maxY: timelineHeight }
     };
-    this.container = container;
-    this.tracker = new ResourceTracker();
-  }
-  init() {
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
-    this.scene = new Scene();
-    this.scene.background = new Color(1973790);
-    this.camera = new PerspectiveCamera(75, width / height, 0.1, 1e3);
-    this.camera.position.set(0, 5, 15);
-    this.renderer = new WebGLRenderer({ antialias: true, alpha: false });
-    this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.container.appendChild(this.renderer.domElement);
-    this.setupLighting();
-    this.setupControls();
-    this.setupEventBoundaries();
-    const resizeObserver = new ResizeObserver(() => this.resize());
-    resizeObserver.observe(this.container);
-    this.animate();
-  }
-  setupLighting() {
-    const ambientLight = this.tracker.track(new AmbientLight(16777215, 0.6));
-    const dirLight = this.tracker.track(new DirectionalLight(16777215, 0.8));
-    dirLight.position.set(10, 20, 10);
-    this.scene.add(ambientLight);
-    this.scene.add(dirLight);
-  }
-  setupControls() {
-    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.controls.enableDamping = true;
-    this.controls.dampingFactor = 0.05;
-  }
-  /**
-   * Architecture 6.0: Event Boundary Management
-   * Prevents Three.js gestures from triggering Obsidian's native pane dragging/scrolling
-   */
-  setupEventBoundaries() {
-    const canvas = this.renderer.domElement;
-    canvas.addEventListener("wheel", (e) => {
-      e.stopPropagation();
-    }, { passive: false });
-    canvas.addEventListener("pointerdown", (e) => {
-      e.stopPropagation();
-    });
-    canvas.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: false });
-    canvas.addEventListener("touchmove", (e) => e.stopPropagation(), { passive: false });
-  }
-  /**
-   * Performance Strategy: InstancedMesh for 1000+ nodes
-   * Now driven entirely by Obsidian File Data
-   */
-  updateNodes(nodes) {
-    const count = nodes.length;
-    if (this.instancedMesh) {
-      this.scene.remove(this.instancedMesh);
-      this.instancedMesh.geometry.dispose();
-      this.instancedMesh.material.dispose();
-      this.instancedMesh.dispose();
-    }
-    if (count === 0)
-      return;
-    const matrices = this.layoutEngine.compute(nodes);
-    const geometry = this.tracker.track(new BoxGeometry(0.5, 0.5, 0.5));
-    const material = this.tracker.track(new MeshStandardMaterial({ color: 4500189 }));
-    this.instancedMesh = this.tracker.track(new InstancedMesh(geometry, material, count));
-    for (let i = 0; i < count; i++) {
-      this.instancedMesh.setMatrixAt(i, matrices[i]);
-    }
-    this.instancedMesh.instanceMatrix.needsUpdate = true;
-    this.scene.add(this.instancedMesh);
-  }
-  resize() {
-    if (!this.container || !this.camera || !this.renderer)
-      return;
-    const width = this.container.clientWidth;
-    const height = this.container.clientHeight;
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
-  }
-  /**
-   * Architecture 9.3: Hard disposal on view close
-   */
-  dispose() {
-    cancelAnimationFrame(this.animationFrameId);
-    if (this.controls)
-      this.controls.dispose();
-    this.tracker.dispose();
-    if (this.renderer) {
-      this.renderer.dispose();
-      this.renderer.forceContextLoss();
-      if (this.container.contains(this.renderer.domElement)) {
-        this.container.removeChild(this.renderer.domElement);
-      }
-    }
   }
 };
 
@@ -21317,84 +21305,618 @@ function writable(value, start = noop) {
 
 // src/engine/SceneStore.ts
 var sceneStore = writable([]);
+var selectedSceneStore = writable(null);
+var timelineBoundsStore = writable({ minDate: 0, maxDate: 0 });
 
-// src/ui/App.svelte
+// src/engine/Renderer3D.ts
+var Renderer3D = class {
+  constructor(container) {
+    this.animationFrameId = 0;
+    this.raycaster = new Raycaster();
+    this.mouse = new Vector2();
+    this.currentNodes = [];
+    this.layoutEngine = new TimelineLayout();
+    // NEW: Store physical boundaries for scrolling
+    this.timelineMinY = 0;
+    this.timelineMaxY = 100;
+    this.animate = () => {
+      this.animationFrameId = requestAnimationFrame(this.animate);
+      this.controls.update();
+      this.renderer.render(this.scene, this.camera);
+    };
+    this.container = container;
+    this.tracker = new ResourceTracker();
+  }
+  init() {
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    this.scene = new Scene();
+    this.scene.background = new Color(1973790);
+    this.camera = new PerspectiveCamera(75, width / height, 0.1, 1e3);
+    this.camera.position.set(0, 0, 15);
+    this.renderer = new WebGLRenderer({ antialias: true, alpha: false });
+    this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(window.devicePixelRatio);
+    this.container.appendChild(this.renderer.domElement);
+    this.setupLighting();
+    this.setupControls();
+    this.setupEventBoundaries();
+    const resizeObserver = new ResizeObserver(() => this.resize());
+    resizeObserver.observe(this.container);
+    this.animate();
+  }
+  setupLighting() {
+    const ambientLight = this.tracker.track(new AmbientLight(16777215, 0.6));
+    const dirLight = this.tracker.track(new DirectionalLight(16777215, 0.8));
+    dirLight.position.set(10, 20, 10);
+    this.scene.add(ambientLight);
+    this.scene.add(dirLight);
+  }
+  setupControls() {
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.enableDamping = true;
+    this.controls.dampingFactor = 0.05;
+    this.controls.enableZoom = false;
+    this.controls.enablePan = false;
+    this.controls.target.set(0, 0, 0);
+  }
+  /**
+   * Architecture 6.0: Event Boundary Management
+   * Prevents Three.js gestures from triggering Obsidian's native pane dragging/scrolling
+   */
+  setupEventBoundaries() {
+    const canvas = this.renderer.domElement;
+    canvas.addEventListener("pointerdown", (e) => e.stopPropagation());
+    canvas.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: false });
+    canvas.addEventListener("touchmove", (e) => e.stopPropagation(), { passive: false });
+    canvas.addEventListener("click", (event) => {
+      const rect = canvas.getBoundingClientRect();
+      this.mouse.x = (event.clientX - rect.left) / rect.width * 2 - 1;
+      this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+      if (this.instancedMesh) {
+        const intersects = this.raycaster.intersectObject(this.instancedMesh);
+        if (intersects.length > 0) {
+          const instanceId = intersects[0].instanceId;
+          if (instanceId !== void 0) {
+            selectedSceneStore.set(this.currentNodes[instanceId]);
+          }
+        } else {
+          selectedSceneStore.set(null);
+        }
+      }
+    });
+    canvas.addEventListener("wheel", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const scrollSpeed = 0.05;
+      const delta = e.deltaY * scrollSpeed;
+      let newY = this.controls.target.y + delta;
+      const padding = 5;
+      newY = MathUtils.clamp(newY, this.timelineMinY - padding, this.timelineMaxY + padding);
+      const diff = newY - this.controls.target.y;
+      this.controls.target.y += diff;
+      this.camera.position.y += diff;
+    }, { passive: false });
+  }
+  /**
+   * Performance Strategy: InstancedMesh for 1000+ nodes
+   * Now driven entirely by Obsidian File Data
+   */
+  updateNodes(nodes, bounds) {
+    this.currentNodes = nodes;
+    const count = nodes.length;
+    if (this.instancedMesh) {
+      this.scene.remove(this.instancedMesh);
+      this.instancedMesh.geometry.dispose();
+      this.instancedMesh.material.dispose();
+      this.instancedMesh.dispose();
+    }
+    if (count === 0)
+      return;
+    const result = this.layoutEngine.compute(nodes, bounds.min, bounds.max);
+    this.timelineMinY = result.bounds.minY;
+    this.timelineMaxY = result.bounds.maxY;
+    const geometry = this.tracker.track(new BoxGeometry(0.5, 0.5, 0.5));
+    const material = this.tracker.track(new MeshStandardMaterial({ color: 4500189 }));
+    this.instancedMesh = this.tracker.track(new InstancedMesh(geometry, material, count));
+    for (let i = 0; i < count; i++) {
+      this.instancedMesh.setMatrixAt(i, result.matrices[i]);
+    }
+    this.instancedMesh.instanceMatrix.needsUpdate = true;
+    this.scene.add(this.instancedMesh);
+  }
+  resize() {
+    if (!this.container || !this.camera || !this.renderer)
+      return;
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    if (width === 0 || height === 0)
+      return;
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+  }
+  /**
+   * Architecture 9.3: Hard disposal on view close
+   */
+  dispose() {
+    cancelAnimationFrame(this.animationFrameId);
+    if (this.controls)
+      this.controls.dispose();
+    this.tracker.dispose();
+    if (this.renderer) {
+      this.renderer.dispose();
+      this.renderer.forceContextLoss();
+      if (this.container.contains(this.renderer.domElement)) {
+        this.container.removeChild(this.renderer.domElement);
+      }
+    }
+  }
+};
+
+// src/ui/InspectorPanel.svelte
 function add_css(target) {
-  append_styles(target, "svelte-1ypf1c5", ".ne3d-wrapper.svelte-1ypf1c5{display:flex;flex-direction:column;height:100%;width:100%;overflow:hidden}.ne3d-toolbar.svelte-1ypf1c5{padding:10px;background-color:var(--background-secondary);border-bottom:1px solid var(--background-modifier-border);display:flex;justify-content:space-between;align-items:center}.ne3d-title.svelte-1ypf1c5{font-weight:bold;color:var(--text-normal)}.ne3d-canvas-container.svelte-1ypf1c5{flex:1;position:relative;width:100%;height:100%}");
+  append_styles(target, "svelte-o40b4b", ".ne3d-inspector.svelte-o40b4b.svelte-o40b4b{width:300px;background-color:var(--background-secondary-alt);border-left:1px solid var(--background-modifier-border);padding:20px;display:flex;flex-direction:column;gap:20px;overflow-y:auto}.inspector-header.svelte-o40b4b h3.svelte-o40b4b{margin:0 0 5px 0;color:var(--text-normal)}.file-path.svelte-o40b4b.svelte-o40b4b{font-size:0.8em;color:var(--text-muted);margin:0;word-break:break-all}.slider-group.svelte-o40b4b.svelte-o40b4b{display:flex;flex-direction:column;gap:8px;color:var(--text-muted)}input[type=range].svelte-o40b4b.svelte-o40b4b{width:100%;cursor:pointer}.empty-state.svelte-o40b4b.svelte-o40b4b{height:100%;display:flex;align-items:center;text-align:center;color:var(--text-faint)}");
 }
-function create_fragment(ctx) {
-  let div4;
-  let div2;
-  let div0;
-  let t1;
-  let div1;
-  let label;
-  let t2;
-  let t3_value = (
-    /*$sceneStore*/
-    ctx[0].length + ""
-  );
-  let t3;
-  let t4;
-  let div3;
+function create_else_block(ctx) {
+  let div;
   return {
     c() {
-      div4 = element("div");
-      div2 = element("div");
-      div0 = element("div");
-      div0.textContent = "Narrative Engine 3D";
-      t1 = space();
-      div1 = element("div");
-      label = element("label");
-      t2 = text("Scenes tracked: ");
-      t3 = text(t3_value);
-      t4 = space();
-      div3 = element("div");
-      attr(div0, "class", "ne3d-title svelte-1ypf1c5");
-      attr(div1, "class", "ne3d-controls");
-      attr(div2, "class", "ne3d-toolbar svelte-1ypf1c5");
-      attr(div3, "class", "ne3d-canvas-container svelte-1ypf1c5");
-      set_style(div3, "touch-action", "none");
-      attr(div4, "class", "ne3d-wrapper svelte-1ypf1c5");
+      div = element("div");
+      div.innerHTML = `<p>Click a cube in the 3D canvas to inspect its properties.</p>`;
+      attr(div, "class", "empty-state svelte-o40b4b");
     },
     m(target, anchor) {
-      insert(target, div4, anchor);
-      append(div4, div2);
-      append(div2, div0);
-      append(div2, t1);
-      append(div2, div1);
-      append(div1, label);
-      append(label, t2);
-      append(label, t3);
-      append(div4, t4);
-      append(div4, div3);
-      ctx[3](div3);
+      insert(target, div, anchor);
+    },
+    p: noop,
+    d(detaching) {
+      if (detaching) {
+        detach(div);
+      }
+    }
+  };
+}
+function create_if_block(ctx) {
+  let div0;
+  let h3;
+  let t0_value = (
+    /*$selectedSceneStore*/
+    ctx[0].title + ""
+  );
+  let t0;
+  let t1;
+  let p;
+  let t2_value = (
+    /*$selectedSceneStore*/
+    ctx[0].id + ""
+  );
+  let t2;
+  let t3;
+  let div1;
+  let label0;
+  let t4;
+  let t5_value = (
+    /*$selectedSceneStore*/
+    ctx[0].emotional.valence.toFixed(2) + ""
+  );
+  let t5;
+  let t6;
+  let input0;
+  let input0_value_value;
+  let t7;
+  let div2;
+  let label1;
+  let t8;
+  let t9_value = (
+    /*$selectedSceneStore*/
+    ctx[0].emotional.intensity.toFixed(2) + ""
+  );
+  let t9;
+  let t10;
+  let input1;
+  let input1_value_value;
+  let mounted;
+  let dispose;
+  return {
+    c() {
+      div0 = element("div");
+      h3 = element("h3");
+      t0 = text(t0_value);
+      t1 = space();
+      p = element("p");
+      t2 = text(t2_value);
+      t3 = space();
+      div1 = element("div");
+      label0 = element("label");
+      t4 = text("Valence (Positive/Negative): ");
+      t5 = text(t5_value);
+      t6 = space();
+      input0 = element("input");
+      t7 = space();
+      div2 = element("div");
+      label1 = element("label");
+      t8 = text("Intensity (Low/High): ");
+      t9 = text(t9_value);
+      t10 = space();
+      input1 = element("input");
+      attr(h3, "class", "svelte-o40b4b");
+      attr(p, "class", "file-path svelte-o40b4b");
+      attr(div0, "class", "inspector-header svelte-o40b4b");
+      attr(input0, "type", "range");
+      attr(input0, "min", "-1");
+      attr(input0, "max", "1");
+      attr(input0, "step", "0.1");
+      input0.value = input0_value_value = /*$selectedSceneStore*/
+      ctx[0].emotional.valence;
+      attr(input0, "class", "svelte-o40b4b");
+      attr(div1, "class", "slider-group svelte-o40b4b");
+      attr(input1, "type", "range");
+      attr(input1, "min", "0");
+      attr(input1, "max", "1");
+      attr(input1, "step", "0.1");
+      input1.value = input1_value_value = /*$selectedSceneStore*/
+      ctx[0].emotional.intensity;
+      attr(input1, "class", "svelte-o40b4b");
+      attr(div2, "class", "slider-group svelte-o40b4b");
+    },
+    m(target, anchor) {
+      insert(target, div0, anchor);
+      append(div0, h3);
+      append(h3, t0);
+      append(div0, t1);
+      append(div0, p);
+      append(p, t2);
+      insert(target, t3, anchor);
+      insert(target, div1, anchor);
+      append(div1, label0);
+      append(label0, t4);
+      append(label0, t5);
+      append(div1, t6);
+      append(div1, input0);
+      insert(target, t7, anchor);
+      insert(target, div2, anchor);
+      append(div2, label1);
+      append(label1, t8);
+      append(label1, t9);
+      append(div2, t10);
+      append(div2, input1);
+      if (!mounted) {
+        dispose = [
+          listen(
+            input0,
+            "input",
+            /*handleValence*/
+            ctx[1]
+          ),
+          listen(
+            input1,
+            "input",
+            /*handleIntensity*/
+            ctx[2]
+          )
+        ];
+        mounted = true;
+      }
+    },
+    p(ctx2, dirty) {
+      if (dirty & /*$selectedSceneStore*/
+      1 && t0_value !== (t0_value = /*$selectedSceneStore*/
+      ctx2[0].title + ""))
+        set_data(t0, t0_value);
+      if (dirty & /*$selectedSceneStore*/
+      1 && t2_value !== (t2_value = /*$selectedSceneStore*/
+      ctx2[0].id + ""))
+        set_data(t2, t2_value);
+      if (dirty & /*$selectedSceneStore*/
+      1 && t5_value !== (t5_value = /*$selectedSceneStore*/
+      ctx2[0].emotional.valence.toFixed(2) + ""))
+        set_data(t5, t5_value);
+      if (dirty & /*$selectedSceneStore*/
+      1 && input0_value_value !== (input0_value_value = /*$selectedSceneStore*/
+      ctx2[0].emotional.valence)) {
+        input0.value = input0_value_value;
+      }
+      if (dirty & /*$selectedSceneStore*/
+      1 && t9_value !== (t9_value = /*$selectedSceneStore*/
+      ctx2[0].emotional.intensity.toFixed(2) + ""))
+        set_data(t9, t9_value);
+      if (dirty & /*$selectedSceneStore*/
+      1 && input1_value_value !== (input1_value_value = /*$selectedSceneStore*/
+      ctx2[0].emotional.intensity)) {
+        input1.value = input1_value_value;
+      }
+    },
+    d(detaching) {
+      if (detaching) {
+        detach(div0);
+        detach(t3);
+        detach(div1);
+        detach(t7);
+        detach(div2);
+      }
+      mounted = false;
+      run_all(dispose);
+    }
+  };
+}
+function create_fragment(ctx) {
+  let div;
+  function select_block_type(ctx2, dirty) {
+    if (
+      /*$selectedSceneStore*/
+      ctx2[0]
+    )
+      return create_if_block;
+    return create_else_block;
+  }
+  let current_block_type = select_block_type(ctx, -1);
+  let if_block = current_block_type(ctx);
+  return {
+    c() {
+      div = element("div");
+      if_block.c();
+      attr(div, "class", "ne3d-inspector svelte-o40b4b");
+    },
+    m(target, anchor) {
+      insert(target, div, anchor);
+      if_block.m(div, null);
     },
     p(ctx2, [dirty]) {
-      if (dirty & /*$sceneStore*/
-      1 && t3_value !== (t3_value = /*$sceneStore*/
-      ctx2[0].length + ""))
-        set_data(t3, t3_value);
+      if (current_block_type === (current_block_type = select_block_type(ctx2, dirty)) && if_block) {
+        if_block.p(ctx2, dirty);
+      } else {
+        if_block.d(1);
+        if_block = current_block_type(ctx2);
+        if (if_block) {
+          if_block.c();
+          if_block.m(div, null);
+        }
+      }
     },
     i: noop,
     o: noop,
     d(detaching) {
       if (detaching) {
-        detach(div4);
+        detach(div);
       }
-      ctx[3](null);
+      if_block.d();
     }
   };
 }
 function instance($$self, $$props, $$invalidate) {
+  let $selectedSceneStore;
+  component_subscribe($$self, selectedSceneStore, ($$value) => $$invalidate(0, $selectedSceneStore = $$value));
+  let { writeQueue } = $$props;
+  function handleValence(e) {
+    const val = parseFloat(e.target.value);
+    if ($selectedSceneStore) {
+      set_store_value(selectedSceneStore, $selectedSceneStore.emotional.valence = val, $selectedSceneStore);
+      writeQueue.enqueue($selectedSceneStore.file, (fm) => {
+        fm.valence = val;
+      });
+    }
+  }
+  function handleIntensity(e) {
+    const val = parseFloat(e.target.value);
+    if ($selectedSceneStore) {
+      set_store_value(selectedSceneStore, $selectedSceneStore.emotional.intensity = val, $selectedSceneStore);
+      writeQueue.enqueue($selectedSceneStore.file, (fm) => {
+        fm.intensity = val;
+      });
+    }
+  }
+  $$self.$$set = ($$props2) => {
+    if ("writeQueue" in $$props2)
+      $$invalidate(3, writeQueue = $$props2.writeQueue);
+  };
+  return [$selectedSceneStore, handleValence, handleIntensity, writeQueue];
+}
+var InspectorPanel = class extends SvelteComponent {
+  constructor(options) {
+    super();
+    init(this, options, instance, create_fragment, safe_not_equal, { writeQueue: 3 }, add_css);
+  }
+};
+var InspectorPanel_default = InspectorPanel;
+
+// src/ui/App.svelte
+function add_css2(target) {
+  append_styles(target, "svelte-1jt2i6s", ".ne3d-wrapper.svelte-1jt2i6s{display:flex;flex-direction:column;height:100%;width:100%;overflow:hidden}.ne3d-toolbar.svelte-1jt2i6s{padding:10px;background-color:var(--background-secondary);border-bottom:1px solid var(--background-modifier-border);display:flex;justify-content:space-between;align-items:center}.ne3d-title.svelte-1jt2i6s{font-weight:bold;color:var(--text-normal)}.ne3d-workspace.svelte-1jt2i6s{display:flex;flex:1;overflow:hidden}.ne3d-canvas-container.svelte-1jt2i6s{flex:1;position:relative;height:100%}");
+}
+function create_else_block2(ctx) {
+  let t;
+  return {
+    c() {
+      t = text("Click a scene...");
+    },
+    m(target, anchor) {
+      insert(target, t, anchor);
+    },
+    p: noop,
+    d(detaching) {
+      if (detaching) {
+        detach(t);
+      }
+    }
+  };
+}
+function create_if_block2(ctx) {
+  let t0;
+  let t1_value = (
+    /*$selectedSceneStore*/
+    ctx[3].title + ""
+  );
+  let t1;
+  return {
+    c() {
+      t0 = text("Selected: ");
+      t1 = text(t1_value);
+    },
+    m(target, anchor) {
+      insert(target, t0, anchor);
+      insert(target, t1, anchor);
+    },
+    p(ctx2, dirty) {
+      if (dirty & /*$selectedSceneStore*/
+      8 && t1_value !== (t1_value = /*$selectedSceneStore*/
+      ctx2[3].title + ""))
+        set_data(t1, t1_value);
+    },
+    d(detaching) {
+      if (detaching) {
+        detach(t0);
+        detach(t1);
+      }
+    }
+  };
+}
+function create_fragment2(ctx) {
+  let div5;
+  let div2;
+  let div0;
+  let t1;
+  let div1;
+  let p;
+  let t2;
+  let t3_value = (
+    /*$sceneStore*/
+    ctx[1].length + ""
+  );
+  let t3;
+  let t4;
+  let span;
+  let t5;
+  let div4;
+  let div3;
+  let t6;
+  let inspectorpanel;
+  let current;
+  function select_block_type(ctx2, dirty) {
+    if (
+      /*$selectedSceneStore*/
+      ctx2[3]
+    )
+      return create_if_block2;
+    return create_else_block2;
+  }
+  let current_block_type = select_block_type(ctx, -1);
+  let if_block = current_block_type(ctx);
+  inspectorpanel = new InspectorPanel_default({
+    props: { writeQueue: (
+      /*writeQueue*/
+      ctx[0]
+    ) }
+  });
+  return {
+    c() {
+      div5 = element("div");
+      div2 = element("div");
+      div0 = element("div");
+      div0.textContent = "Narrative Engine 3D";
+      t1 = space();
+      div1 = element("div");
+      p = element("p");
+      t2 = text("Scenes tracked: ");
+      t3 = text(t3_value);
+      t4 = space();
+      span = element("span");
+      if_block.c();
+      t5 = space();
+      div4 = element("div");
+      div3 = element("div");
+      t6 = space();
+      create_component(inspectorpanel.$$.fragment);
+      attr(div0, "class", "ne3d-title svelte-1jt2i6s");
+      set_style(span, "margin-left", "20px");
+      set_style(span, "color", "var(--text-accent)");
+      attr(div1, "class", "ne3d-controls");
+      attr(div2, "class", "ne3d-toolbar svelte-1jt2i6s");
+      attr(div3, "class", "ne3d-canvas-container svelte-1jt2i6s");
+      set_style(div3, "touch-action", "none");
+      attr(div4, "class", "ne3d-workspace svelte-1jt2i6s");
+      attr(div5, "class", "ne3d-wrapper svelte-1jt2i6s");
+    },
+    m(target, anchor) {
+      insert(target, div5, anchor);
+      append(div5, div2);
+      append(div2, div0);
+      append(div2, t1);
+      append(div2, div1);
+      append(div1, p);
+      append(p, t2);
+      append(p, t3);
+      append(div1, t4);
+      append(div1, span);
+      if_block.m(span, null);
+      append(div5, t5);
+      append(div5, div4);
+      append(div4, div3);
+      ctx[6](div3);
+      append(div4, t6);
+      mount_component(inspectorpanel, div4, null);
+      current = true;
+    },
+    p(ctx2, [dirty]) {
+      if ((!current || dirty & /*$sceneStore*/
+      2) && t3_value !== (t3_value = /*$sceneStore*/
+      ctx2[1].length + ""))
+        set_data(t3, t3_value);
+      if (current_block_type === (current_block_type = select_block_type(ctx2, dirty)) && if_block) {
+        if_block.p(ctx2, dirty);
+      } else {
+        if_block.d(1);
+        if_block = current_block_type(ctx2);
+        if (if_block) {
+          if_block.c();
+          if_block.m(span, null);
+        }
+      }
+      const inspectorpanel_changes = {};
+      if (dirty & /*writeQueue*/
+      1)
+        inspectorpanel_changes.writeQueue = /*writeQueue*/
+        ctx2[0];
+      inspectorpanel.$set(inspectorpanel_changes);
+    },
+    i(local) {
+      if (current)
+        return;
+      transition_in(inspectorpanel.$$.fragment, local);
+      current = true;
+    },
+    o(local) {
+      transition_out(inspectorpanel.$$.fragment, local);
+      current = false;
+    },
+    d(detaching) {
+      if (detaching) {
+        detach(div5);
+      }
+      if_block.d();
+      ctx[6](null);
+      destroy_component(inspectorpanel);
+    }
+  };
+}
+function instance2($$self, $$props, $$invalidate) {
+  let $timelineBoundsStore;
   let $sceneStore;
-  component_subscribe($$self, sceneStore, ($$value) => $$invalidate(0, $sceneStore = $$value));
+  let $selectedSceneStore;
+  component_subscribe($$self, timelineBoundsStore, ($$value) => $$invalidate(5, $timelineBoundsStore = $$value));
+  component_subscribe($$self, sceneStore, ($$value) => $$invalidate(1, $sceneStore = $$value));
+  component_subscribe($$self, selectedSceneStore, ($$value) => $$invalidate(3, $selectedSceneStore = $$value));
+  let { writeQueue } = $$props;
   let container;
   let renderer;
   onMount(() => {
-    $$invalidate(2, renderer = new Renderer3D(container));
+    $$invalidate(4, renderer = new Renderer3D(container));
     renderer.init();
-    renderer.updateNodes($sceneStore);
+    renderer.updateNodes($sceneStore, {
+      min: $timelineBoundsStore.minDate,
+      max: $timelineBoundsStore.maxDate
+    });
   });
   onDestroy(() => {
     if (renderer)
@@ -21403,24 +21925,39 @@ function instance($$self, $$props, $$invalidate) {
   function div3_binding($$value) {
     binding_callbacks[$$value ? "unshift" : "push"](() => {
       container = $$value;
-      $$invalidate(1, container);
+      $$invalidate(2, container);
     });
   }
+  $$self.$$set = ($$props2) => {
+    if ("writeQueue" in $$props2)
+      $$invalidate(0, writeQueue = $$props2.writeQueue);
+  };
   $$self.$$.update = () => {
-    if ($$self.$$.dirty & /*renderer, $sceneStore*/
-    5) {
+    if ($$self.$$.dirty & /*renderer, $sceneStore, $timelineBoundsStore*/
+    50) {
       $:
-        if (renderer && $sceneStore) {
-          renderer.updateNodes($sceneStore);
+        if (renderer && $sceneStore && $timelineBoundsStore) {
+          renderer.updateNodes($sceneStore, {
+            min: $timelineBoundsStore.minDate,
+            max: $timelineBoundsStore.maxDate
+          });
         }
     }
   };
-  return [$sceneStore, container, renderer, div3_binding];
+  return [
+    writeQueue,
+    $sceneStore,
+    container,
+    $selectedSceneStore,
+    renderer,
+    $timelineBoundsStore,
+    div3_binding
+  ];
 }
 var App = class extends SvelteComponent {
   constructor(options) {
     super();
-    init(this, options, instance, create_fragment, safe_not_equal, {}, add_css);
+    init(this, options, instance2, create_fragment2, safe_not_equal, { writeQueue: 0 }, add_css2);
   }
 };
 var App_default = App;
@@ -21455,25 +21992,39 @@ var NE3DView = class extends import_obsidian.ItemView {
 
 // src/engine/SceneIndexer.ts
 var SceneIndexer = class {
-  // e.g., "Scenes/" to restrict the scope
   constructor(app, targetFolder = "") {
     this.app = app;
     this.targetFolder = targetFolder;
   }
-  // Initial scan of the vault
   indexVault() {
     const files = this.app.vault.getMarkdownFiles();
     const nodes = [];
+    let minDate = Infinity;
+    let maxDate = -Infinity;
     for (const file of files) {
       if (this.targetFolder && !file.path.startsWith(this.targetFolder))
         continue;
       const node = this.parseFile(file);
-      if (node)
+      if (node) {
         nodes.push(node);
+        if (node.storyDate < minDate)
+          minDate = node.storyDate;
+        if (node.storyDate > maxDate)
+          maxDate = node.storyDate;
+      }
     }
+    if (nodes.length === 0) {
+      minDate = 0;
+      maxDate = 0;
+    } else {
+      if (minDate === Infinity)
+        minDate = 0;
+      if (maxDate === -Infinity)
+        maxDate = 0;
+    }
+    timelineBoundsStore.set({ min: minDate, max: maxDate });
     sceneStore.set(nodes);
   }
-  // Parse a single file's frontmatter into our canonical model
   parseFile(file) {
     if (!file.path.startsWith("02_Eras/Era_01/Summaries"))
       return null;
@@ -21493,16 +22044,39 @@ var SceneIndexer = class {
       }
     };
   }
-  // Listen for live updates when the user edits a markdown file
   registerListeners(registerEvent) {
     registerEvent(
-      this.app.metadataCache.on("changed", (file, data, cache) => {
+      this.app.metadataCache.on("changed", (file) => {
         if (this.targetFolder && !file.path.startsWith(this.targetFolder))
           return;
-        console.log(`Live update detected on: ${file.basename}`);
         this.indexVault();
       })
     );
+  }
+};
+
+// src/engine/FrontmatterWriteQueue.ts
+var FrontmatterWriteQueue = class {
+  constructor(app) {
+    this.queues = /* @__PURE__ */ new Map();
+    this.debounceTimers = /* @__PURE__ */ new Map();
+    this.app = app;
+  }
+  enqueue(file, updateFn) {
+    const path = file.path;
+    if (this.debounceTimers.has(path)) {
+      clearTimeout(this.debounceTimers.get(path));
+    }
+    const timer = setTimeout(() => {
+      const prev = this.queues.get(path) || Promise.resolve();
+      const next = prev.then(
+        () => this.app.fileManager.processFrontMatter(file, updateFn)
+      ).catch((e) => {
+        console.error("NE3D Write Error: ", e);
+      });
+      this.queues.set(path, next);
+    }, 250);
+    this.debounceTimers.set(path, timer);
   }
 };
 
@@ -21510,11 +22084,12 @@ var SceneIndexer = class {
 var NE3DPlugin = class extends import_obsidian2.Plugin {
   async onload() {
     this.indexer = new SceneIndexer(this.app);
+    this.writeQueue = new FrontmatterWriteQueue(this.app);
     this.app.workspace.onLayoutReady(() => {
       this.indexer.indexVault();
       this.indexer.registerListeners(this.registerEvent.bind(this));
     });
-    this.registerView(VIEW_TYPE_NE3D, (leaf) => new NE3DView(leaf));
+    this.registerView(VIEW_TYPE_NE3D, (leaf) => new NE3DView(leaf, this.writeQueue));
     this.addRibbonIcon("box", "Open NE3D Canvas", () => {
       this.activateView();
     });

@@ -1,3 +1,5 @@
+// src/engine/SceneStore.ts
+
 import { writable } from 'svelte/store';
 import { TFile } from 'obsidian';
 
@@ -16,3 +18,7 @@ export interface SceneNode {
 
 // Architecture 11.2: Central observable store
 export const sceneStore = writable<SceneNode[]>([]);
+export const selectedSceneStore = writable<SceneNode | null>(null);
+
+// Store the first and last dates for proportional mapping
+export const timelineBoundsStore = writable<{minDate: number, maxDate: number}>({ minDate: 0, maxDate: 0 });

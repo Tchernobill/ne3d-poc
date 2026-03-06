@@ -1,7 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { Renderer3D } from '../engine/Renderer3D';
-  import { sceneStore } from '../engine/SceneStore';
+  import { sceneStore, selectedSceneStore, timelineBoundsStore } from '../engine/SceneStore';
+  import InspectorPanel from './InspectorPanel.svelte'; 
+  import type { FrontmatterWriteQueue } from '../engine/FrontmatterWriteQueue'; 
+
+  export let writeQueue: FrontmatterWriteQueue; 
 
   let container: HTMLDivElement;
   let renderer: Renderer3D;
@@ -9,17 +13,17 @@
   onMount(() => {
     renderer = new Renderer3D(container);
     renderer.init();
-    renderer.updateNodes($sceneStore);
+    // Pass both the nodes and the bounds
+    renderer.updateNodes($sceneStore, { min: $timelineBoundsStore.minDate, max: $timelineBoundsStore.maxDate });
   });
 
   onDestroy(() => {
     if (renderer) renderer.dispose();
   });
 
-  // MAGIC: This Svelte reactive statement watches the Obsidian vault.
-  // Anytime a markdown file is edited, it pushes the new data to the 3D engine!
-  $: if (renderer && $sceneStore) {
-    renderer.updateNodes($sceneStore);
+  // Reactive trigger updates if nodes or bounds change
+  $: if (renderer && $sceneStore && $timelineBoundsStore) {
+    renderer.updateNodes($sceneStore, { min: $timelineBoundsStore.minDate, max: $timelineBoundsStore.maxDate });
   }
 </script>
 
@@ -27,11 +31,21 @@
   <div class="ne3d-toolbar">
     <div class="ne3d-title">Narrative Engine 3D</div>
     <div class="ne3d-controls">
-      <label>Scenes tracked: {$sceneStore.length}</label>
+      <p>Scenes tracked: {$sceneStore.length}</p>
+      <span style="margin-left: 20px; color: var(--text-accent);">
+        {#if $selectedSceneStore}
+          Selected: {$selectedSceneStore.title}
+        {:else}
+          Click a scene...
+        {/if}
+      </span>
     </div>
   </div>
 
-  <div bind:this={container} class="ne3d-canvas-container" style="touch-action: none;"></div>
+  <div class="ne3d-workspace">
+    <div bind:this={container} class="ne3d-canvas-container" style="touch-action: none;"></div>
+    <InspectorPanel writeQueue={writeQueue} />
+  </div>
 </div>
 
 <style>
@@ -54,10 +68,14 @@
     font-weight: bold;
     color: var(--text-normal);
   }
+  .ne3d-workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
   .ne3d-canvas-container {
     flex: 1;
     position: relative;
-    width: 100%;
     height: 100%;
   }
 </style>

@@ -1,41 +1,56 @@
+// src/engine/SceneIndexer.ts
+
 import { App, TFile } from 'obsidian';
-import { SceneNode, sceneStore } from './SceneStore';
+import { SceneNode, sceneStore, timelineBoundsStore } from './SceneStore'; // Import bounds store
 
 export class SceneIndexer {
   private app: App;
-  private targetFolder: string; // e.g., "Scenes/" to restrict the scope
+  private targetFolder: string; 
 
   constructor(app: App, targetFolder: string = "") {
     this.app = app;
     this.targetFolder = targetFolder;
   }
 
-  // Initial scan of the vault
   public indexVault() {
     const files = this.app.vault.getMarkdownFiles();
     const nodes: SceneNode[] =[];
+    
+    // Track min and max dates
+    let minDate = Infinity;
+    let maxDate = -Infinity;
 
     for (const file of files) {
       if (this.targetFolder && !file.path.startsWith(this.targetFolder)) continue;
       
       const node = this.parseFile(file);
-      if (node) nodes.push(node);
+      if (node) {
+        nodes.push(node);
+        // Calculate bounds
+        if (node.storyDate < minDate) minDate = node.storyDate;
+        if (node.storyDate > maxDate) maxDate = node.storyDate;
+      }
     }
 
-    // Update the Svelte store
+    // Safety fallbacks if vault is empty or dates are invalid
+    if (nodes.length === 0) {
+      minDate = 0; maxDate = 0;
+    } else {
+      if (minDate === Infinity) minDate = 0;
+      if (maxDate === -Infinity) maxDate = 0;
+    }
+
+    // Update both stores
+    timelineBoundsStore.set({ min: minDate, max: maxDate });
     sceneStore.set(nodes);
   }
 
-
-  // Parse a single file's frontmatter into our canonical model
   private parseFile(file: TFile): SceneNode | null {
-    // 1. Strict Folder Filter (Obsidian uses forward slashes internally)
     if (!file.path.startsWith('02_Eras/Era_01/Summaries')) return null;
 
     const cache = this.app.metadataCache.getFileCache(file);
     const fm = cache?.frontmatter;
 
-    // 2. Strict Frontmatter Property Filter
     if (fm?.note_type !== 'scene_summary') return null;
 
     return {
@@ -51,14 +66,11 @@ export class SceneIndexer {
     };
   }
 
-  // Listen for live updates when the user edits a markdown file
   public registerListeners(registerEvent: (event: any) => void) {
     registerEvent(
-      this.app.metadataCache.on('changed', (file: TFile, data: string, cache: any) => {
+      this.app.metadataCache.on('changed', (file) => {
         if (this.targetFolder && !file.path.startsWith(this.targetFolder)) return;
-        
-        console.log(`Live update detected on: ${file.basename}`);
-        this.indexVault(); // Simple implementation: re-index all. (Can be optimized later)
+        this.indexVault(); 
       })
     );
   }

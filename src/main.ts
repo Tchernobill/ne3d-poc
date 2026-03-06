@@ -1,13 +1,16 @@
 ﻿import { Plugin, WorkspaceLeaf } from 'obsidian';
 import { NE3DView, VIEW_TYPE_NE3D } from './NE3DView';
 import { SceneIndexer } from './engine/SceneIndexer';
+import { FrontmatterWriteQueue } from './engine/FrontmatterWriteQueue'; 
 
 export default class NE3DPlugin extends Plugin {
   public indexer!: SceneIndexer;
+  public writeQueue!: FrontmatterWriteQueue;
 
   async onload() {
     // 1. Initialize the Data Layer
     this.indexer = new SceneIndexer(this.app);
+    this.writeQueue = new FrontmatterWriteQueue(this.app);
     
     // Wait for Obsidian to finish indexing its metadata cache on startup
     this.app.workspace.onLayoutReady(() => {
@@ -17,7 +20,8 @@ export default class NE3DPlugin extends Plugin {
     });
 
     // 2. Register the custom ItemView
-    this.registerView(VIEW_TYPE_NE3D, (leaf: WorkspaceLeaf) => new NE3DView(leaf));
+    // this.registerView(VIEW_TYPE_NE3D, (leaf: WorkspaceLeaf) => new NE3DView(leaf));
+    this.registerView(VIEW_TYPE_NE3D, (leaf) => new NE3DView(leaf, this.writeQueue));
 
     // 3. Add a ribbon icon to open the 3D Canvas
     this.addRibbonIcon('box', 'Open NE3D Canvas', () => {

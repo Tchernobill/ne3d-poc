@@ -1,22 +1,36 @@
+// src/engine/TimelineLayout.ts
+
 import { SceneNode } from './SceneStore';
 import * as THREE from 'three';
 
+export interface LayoutBounds {
+  minY: number;
+  maxY: number;
+}
+
 export class TimelineLayout {
-  public compute(nodes: SceneNode[]): THREE.Matrix4[] {
+  public compute(nodes: SceneNode[], minDate: number, maxDate: number): { matrices: THREE.Matrix4[], bounds: LayoutBounds } {
     const matrices: THREE.Matrix4[] =[];
     const dummy = new THREE.Object3D();
 
-    // Sort nodes chronologically
-    const sortedNodes = [...nodes].sort((a, b) => a.storyDate - b.storyDate);
+    // Define the total physical height of the 3D timeline (scales with node count)
+    const timelineHeight = Math.max(nodes.length * 3.0, 10);
+    const dateRange = maxDate - minDate;
 
-    sortedNodes.forEach((node, index) => {
-      // X Axis: Progression of time (index or storyDate)
-      const x = index * 2.0; 
+    nodes.forEach((node) => {
+      // Y-AXIS: Proportional position in time
+      let y = 0;
+      if (dateRange > 0) {
+        const proportion = (node.storyDate - minDate) / dateRange;
+        y = proportion * timelineHeight;
+      } else {
+        y = timelineHeight / 2; // Fallback if all dates are the same
+      }
       
-      // Y Axis: Emotional Valence (High = positive, Low = negative)
-      const y = node.emotional.valence * 5.0; 
+      // X-AXIS: Emotional Valence (swapped from Y)
+      const x = node.emotional.valence * 5.0; 
       
-      // Z Axis: Era or spatial separation
+      // Z-AXIS: Era or spatial separation
       const z = node.era * -3.0;
 
       dummy.position.set(x, y, z);
@@ -29,6 +43,9 @@ export class TimelineLayout {
       matrices.push(dummy.matrix.clone());
     });
 
-    return matrices;
+    return { 
+      matrices, 
+      bounds: { minY: 0, maxY: timelineHeight } 
+    };
   }
 }
