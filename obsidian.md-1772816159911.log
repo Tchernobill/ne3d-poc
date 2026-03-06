@@ -1,0 +1,177 @@
+app.js:1 Obsidian Developer Console
+plugin:dataview:20478 Dataview: version 0.5.68 (requires obsidian 0.13.11)
+plugin:dataview:13006 Dataview: all 396 files have been indexed in 0.746s (396 cached, 0 skipped).
+VM151 plugin:ne3d-poc:22255 [SceneIndexer] Scanning vault... Found 396 markdown files total.
+VM151 plugin:ne3d-poc:22277 [SceneIndexer] Successfully parsed 74 scenes.
+VM151 plugin:ne3d-poc:22278 [SceneIndexer] Extracted Date Range: 4364865900000 to 4404891600000
+[Violation] Forced reflow while executing JavaScript took 33ms
+VM189 plugin:ne3d-poc:20666 WARNING: Multiple instances of Three.js being imported.
+anonymous @ VM189 plugin:ne3d-poc:20666
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+a @ app.js:1
+Promise.then
+l @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+e.enablePluginAndSave @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+t.setValue @ app.js:1
+t.onClick @ app.js:1
+VM189 plugin:ne3d-poc:22264 [SceneIndexer] Scanning vault... Found 396 markdown files total.
+VM189 plugin:ne3d-poc:22286 [SceneIndexer] Successfully parsed 74 scenes.
+VM189 plugin:ne3d-poc:22287 [SceneIndexer] Extracted Date Range: 4364865900000 to 4404891600000
+VM194 plugin:ne3d-poc:20666 WARNING: Multiple instances of Three.js being imported.
+anonymous @ VM194 plugin:ne3d-poc:20666
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+a @ app.js:1
+Promise.then
+l @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+e.enablePluginAndSave @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+t.setValue @ app.js:1
+t.onClick @ app.js:1
+VM194 plugin:ne3d-poc:22264 [SceneIndexer] Scanning vault... Found 396 markdown files total.
+VM194 plugin:ne3d-poc:22286 [SceneIndexer] Successfully parsed 74 scenes.
+VM194 plugin:ne3d-poc:22287 [SceneIndexer] Extracted Date Range: 4364865900000 to 4404891600000
+VM199 plugin:ne3d-poc:20666 WARNING: Multiple instances of Three.js being imported.
+anonymous @ VM199 plugin:ne3d-poc:20666
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+a @ app.js:1
+Promise.then
+l @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+e.enablePluginAndSave @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+t.setValue @ app.js:1
+t.onClick @ app.js:1
+VM199 plugin:ne3d-poc:22264 [SceneIndexer] Scanning vault... Found 396 markdown files total.
+VM199 plugin:ne3d-poc:22286 [SceneIndexer] Successfully parsed 74 scenes.
+VM199 plugin:ne3d-poc:22287 [SceneIndexer] Extracted Date Range: 4364865900000 to 4404891600000
+VM204 plugin:ne3d-poc:20666 WARNING: Multiple instances of Three.js being imported.
+anonymous @ VM204 plugin:ne3d-poc:20666
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+a @ app.js:1
+Promise.then
+l @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+e.enablePluginAndSave @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+t.setValue @ app.js:1
+t.onClick @ app.js:1
+VM204 plugin:ne3d-poc:22264 [SceneIndexer] Scanning vault... Found 396 markdown files total.
+VM204 plugin:ne3d-poc:22286 [SceneIndexer] Successfully parsed 74 scenes.
+VM204 plugin:ne3d-poc:22287 [SceneIndexer] Extracted Date Range: 4364865900000 to 4404891600000
+plugin:ne3d-poc:20666 WARNING: Multiple instances of Three.js being imported.
+anonymous @ plugin:ne3d-poc:20666
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+a @ app.js:1
+Promise.then
+l @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+e.enablePluginAndSave @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+(anonymous) @ app.js:1
+y @ app.js:1
+(anonymous) @ app.js:1
+t.setValue @ app.js:1
+t.onClick @ app.js:1
+plugin:ne3d-poc:22264 [SceneIndexer] Scanning vault... Found 396 markdown files total.
+plugin:ne3d-poc:22286 [SceneIndexer] Successfully parsed 74 scenes.
+plugin:ne3d-poc:22287 [SceneIndexer] Extracted Date Range: 4364865900000 to 4404891600000

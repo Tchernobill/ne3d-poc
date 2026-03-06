@@ -21,4 +21,4 @@ export const sceneStore = writable<SceneNode[]>([]);
 export const selectedSceneStore = writable<SceneNode | null>(null);
 
 // Store the first and last dates for proportional mapping
-export const timelineBoundsStore = writable<{minDate: number, maxDate: number}>({ minDate: 0, maxDate: 0 });
+export const timelineBoundsStore = writable<{min: number, max: number}>({ min: 0, max: 0 });

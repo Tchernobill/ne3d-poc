@@ -1,4 +1,3 @@
-/* NE3D Proof of Concept */
 "use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -19098,6 +19097,187 @@ var InstancedMesh = class extends Mesh {
     this.dispatchEvent({ type: "dispose" });
   }
 };
+var LineBasicMaterial = class extends Material {
+  constructor(parameters) {
+    super();
+    this.isLineBasicMaterial = true;
+    this.type = "LineBasicMaterial";
+    this.color = new Color(16777215);
+    this.map = null;
+    this.linewidth = 1;
+    this.linecap = "round";
+    this.linejoin = "round";
+    this.fog = true;
+    this.setValues(parameters);
+  }
+  copy(source) {
+    super.copy(source);
+    this.color.copy(source.color);
+    this.map = source.map;
+    this.linewidth = source.linewidth;
+    this.linecap = source.linecap;
+    this.linejoin = source.linejoin;
+    this.fog = source.fog;
+    return this;
+  }
+};
+var _start$1 = /* @__PURE__ */ new Vector3();
+var _end$1 = /* @__PURE__ */ new Vector3();
+var _inverseMatrix$1 = /* @__PURE__ */ new Matrix4();
+var _ray$1 = /* @__PURE__ */ new Ray();
+var _sphere$1 = /* @__PURE__ */ new Sphere();
+var Line = class extends Object3D {
+  constructor(geometry = new BufferGeometry(), material = new LineBasicMaterial()) {
+    super();
+    this.isLine = true;
+    this.type = "Line";
+    this.geometry = geometry;
+    this.material = material;
+    this.updateMorphTargets();
+  }
+  copy(source, recursive) {
+    super.copy(source, recursive);
+    this.material = Array.isArray(source.material) ? source.material.slice() : source.material;
+    this.geometry = source.geometry;
+    return this;
+  }
+  computeLineDistances() {
+    const geometry = this.geometry;
+    if (geometry.index === null) {
+      const positionAttribute = geometry.attributes.position;
+      const lineDistances = [0];
+      for (let i = 1, l = positionAttribute.count; i < l; i++) {
+        _start$1.fromBufferAttribute(positionAttribute, i - 1);
+        _end$1.fromBufferAttribute(positionAttribute, i);
+        lineDistances[i] = lineDistances[i - 1];
+        lineDistances[i] += _start$1.distanceTo(_end$1);
+      }
+      geometry.setAttribute("lineDistance", new Float32BufferAttribute(lineDistances, 1));
+    } else {
+      console.warn("THREE.Line.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+    }
+    return this;
+  }
+  raycast(raycaster, intersects) {
+    const geometry = this.geometry;
+    const matrixWorld = this.matrixWorld;
+    const threshold = raycaster.params.Line.threshold;
+    const drawRange = geometry.drawRange;
+    if (geometry.boundingSphere === null)
+      geometry.computeBoundingSphere();
+    _sphere$1.copy(geometry.boundingSphere);
+    _sphere$1.applyMatrix4(matrixWorld);
+    _sphere$1.radius += threshold;
+    if (raycaster.ray.intersectsSphere(_sphere$1) === false)
+      return;
+    _inverseMatrix$1.copy(matrixWorld).invert();
+    _ray$1.copy(raycaster.ray).applyMatrix4(_inverseMatrix$1);
+    const localThreshold = threshold / ((this.scale.x + this.scale.y + this.scale.z) / 3);
+    const localThresholdSq = localThreshold * localThreshold;
+    const vStart = new Vector3();
+    const vEnd = new Vector3();
+    const interSegment = new Vector3();
+    const interRay = new Vector3();
+    const step = this.isLineSegments ? 2 : 1;
+    const index = geometry.index;
+    const attributes = geometry.attributes;
+    const positionAttribute = attributes.position;
+    if (index !== null) {
+      const start = Math.max(0, drawRange.start);
+      const end = Math.min(index.count, drawRange.start + drawRange.count);
+      for (let i = start, l = end - 1; i < l; i += step) {
+        const a = index.getX(i);
+        const b = index.getX(i + 1);
+        vStart.fromBufferAttribute(positionAttribute, a);
+        vEnd.fromBufferAttribute(positionAttribute, b);
+        const distSq = _ray$1.distanceSqToSegment(vStart, vEnd, interRay, interSegment);
+        if (distSq > localThresholdSq)
+          continue;
+        interRay.applyMatrix4(this.matrixWorld);
+        const distance = raycaster.ray.origin.distanceTo(interRay);
+        if (distance < raycaster.near || distance > raycaster.far)
+          continue;
+        intersects.push({
+          distance,
+          // What do we want? intersection point on the ray or on the segment??
+          // point: raycaster.ray.at( distance ),
+          point: interSegment.clone().applyMatrix4(this.matrixWorld),
+          index: i,
+          face: null,
+          faceIndex: null,
+          object: this
+        });
+      }
+    } else {
+      const start = Math.max(0, drawRange.start);
+      const end = Math.min(positionAttribute.count, drawRange.start + drawRange.count);
+      for (let i = start, l = end - 1; i < l; i += step) {
+        vStart.fromBufferAttribute(positionAttribute, i);
+        vEnd.fromBufferAttribute(positionAttribute, i + 1);
+        const distSq = _ray$1.distanceSqToSegment(vStart, vEnd, interRay, interSegment);
+        if (distSq > localThresholdSq)
+          continue;
+        interRay.applyMatrix4(this.matrixWorld);
+        const distance = raycaster.ray.origin.distanceTo(interRay);
+        if (distance < raycaster.near || distance > raycaster.far)
+          continue;
+        intersects.push({
+          distance,
+          // What do we want? intersection point on the ray or on the segment??
+          // point: raycaster.ray.at( distance ),
+          point: interSegment.clone().applyMatrix4(this.matrixWorld),
+          index: i,
+          face: null,
+          faceIndex: null,
+          object: this
+        });
+      }
+    }
+  }
+  updateMorphTargets() {
+    const geometry = this.geometry;
+    const morphAttributes = geometry.morphAttributes;
+    const keys = Object.keys(morphAttributes);
+    if (keys.length > 0) {
+      const morphAttribute = morphAttributes[keys[0]];
+      if (morphAttribute !== void 0) {
+        this.morphTargetInfluences = [];
+        this.morphTargetDictionary = {};
+        for (let m = 0, ml = morphAttribute.length; m < ml; m++) {
+          const name = morphAttribute[m].name || String(m);
+          this.morphTargetInfluences.push(0);
+          this.morphTargetDictionary[name] = m;
+        }
+      }
+    }
+  }
+};
+var _start = /* @__PURE__ */ new Vector3();
+var _end = /* @__PURE__ */ new Vector3();
+var LineSegments = class extends Line {
+  constructor(geometry, material) {
+    super(geometry, material);
+    this.isLineSegments = true;
+    this.type = "LineSegments";
+  }
+  computeLineDistances() {
+    const geometry = this.geometry;
+    if (geometry.index === null) {
+      const positionAttribute = geometry.attributes.position;
+      const lineDistances = [];
+      for (let i = 0, l = positionAttribute.count; i < l; i += 2) {
+        _start.fromBufferAttribute(positionAttribute, i);
+        _end.fromBufferAttribute(positionAttribute, i + 1);
+        lineDistances[i] = i === 0 ? 0 : lineDistances[i - 1];
+        lineDistances[i + 1] = lineDistances[i] + _start.distanceTo(_end);
+      }
+      geometry.setAttribute("lineDistance", new Float32BufferAttribute(lineDistances, 1));
+    } else {
+      console.warn("THREE.LineSegments.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
+    }
+    return this;
+  }
+};
 var MeshStandardMaterial = class extends Material {
   constructor(parameters) {
     super();
@@ -20407,6 +20587,75 @@ var Spherical = class {
     return new this.constructor().copy(this);
   }
 };
+var AxesHelper = class extends LineSegments {
+  constructor(size = 1) {
+    const vertices = [
+      0,
+      0,
+      0,
+      size,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      size,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      size
+    ];
+    const colors = [
+      1,
+      0,
+      0,
+      1,
+      0.6,
+      0,
+      0,
+      1,
+      0,
+      0.6,
+      1,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0.6,
+      1
+    ];
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+    geometry.setAttribute("color", new Float32BufferAttribute(colors, 3));
+    const material = new LineBasicMaterial({ vertexColors: true, toneMapped: false });
+    super(geometry, material);
+    this.type = "AxesHelper";
+  }
+  setColors(xAxisColor, yAxisColor, zAxisColor) {
+    const color = new Color();
+    const array = this.geometry.attributes.color.array;
+    color.set(xAxisColor);
+    color.toArray(array, 0);
+    color.toArray(array, 3);
+    color.set(yAxisColor);
+    color.toArray(array, 6);
+    color.toArray(array, 9);
+    color.set(zAxisColor);
+    color.toArray(array, 12);
+    color.toArray(array, 15);
+    this.geometry.attributes.color.needsUpdate = true;
+    return this;
+  }
+  dispose() {
+    this.geometry.dispose();
+    this.material.dispose();
+  }
+};
 if (typeof __THREE_DEVTOOLS__ !== "undefined") {
   __THREE_DEVTOOLS__.dispatchEvent(new CustomEvent("register", { detail: {
     revision: REVISION
@@ -21234,17 +21483,17 @@ var TimelineLayout = class {
   compute(nodes, minDate, maxDate) {
     const matrices = [];
     const dummy = new Object3D();
-    const timelineHeight = Math.max(nodes.length * 3, 10);
+    const timelineWidth = Math.max(nodes.length * 3, 10);
     const dateRange = maxDate - minDate;
     nodes.forEach((node) => {
-      let y = 0;
+      let x = 0;
       if (dateRange > 0) {
         const proportion = (node.storyDate - minDate) / dateRange;
-        y = proportion * timelineHeight;
+        x = proportion * timelineWidth;
       } else {
-        y = timelineHeight / 2;
+        x = timelineWidth / 2;
       }
-      const x = node.emotional.valence * 5;
+      const y = node.emotional.valence * 5;
       const z = node.era * -3;
       dummy.position.set(x, y, z);
       const scale = 0.5 + node.emotional.intensity * 1.5;
@@ -21254,7 +21503,7 @@ var TimelineLayout = class {
     });
     return {
       matrices,
-      bounds: { minY: 0, maxY: timelineHeight }
+      bounds: { minX: 0, maxX: timelineWidth }
     };
   }
 };
@@ -21306,7 +21555,7 @@ function writable(value, start = noop) {
 // src/engine/SceneStore.ts
 var sceneStore = writable([]);
 var selectedSceneStore = writable(null);
-var timelineBoundsStore = writable({ minDate: 0, maxDate: 0 });
+var timelineBoundsStore = writable({ min: 0, max: 0 });
 
 // src/engine/Renderer3D.ts
 var Renderer3D = class {
@@ -21316,9 +21565,8 @@ var Renderer3D = class {
     this.mouse = new Vector2();
     this.currentNodes = [];
     this.layoutEngine = new TimelineLayout();
-    // NEW: Store physical boundaries for scrolling
-    this.timelineMinY = 0;
-    this.timelineMaxY = 100;
+    this.timelineMinX = 0;
+    this.timelineMaxX = 100;
     this.animate = () => {
       this.animationFrameId = requestAnimationFrame(this.animate);
       this.controls.update();
@@ -21333,14 +21581,29 @@ var Renderer3D = class {
     this.scene = new Scene();
     this.scene.background = new Color(1973790);
     this.camera = new PerspectiveCamera(75, width / height, 0.1, 1e3);
-    this.camera.position.set(0, 0, 15);
+    this.camera.position.set(0, 0, 30);
     this.renderer = new WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.container.appendChild(this.renderer.domElement);
+    const canvas = this.renderer.domElement;
+    canvas.classList.add("no-drag");
+    canvas.style.position = "absolute";
+    canvas.style.top = "0";
+    canvas.style.left = "0";
+    canvas.style.width = "100%";
+    canvas.style.height = "100%";
+    canvas.style.zIndex = "10";
+    canvas.style.touchAction = "none";
+    this.container.appendChild(canvas);
     this.setupLighting();
     this.setupControls();
     this.setupEventBoundaries();
+    const axesHelper = this.tracker.track(new AxesHelper(10));
+    this.scene.add(axesHelper);
+    const debugGeo = this.tracker.track(new BoxGeometry(4, 4, 4));
+    const debugMat = this.tracker.track(new MeshBasicMaterial({ color: 16711680, wireframe: true }));
+    const debugCube = this.tracker.track(new Mesh(debugGeo, debugMat));
+    this.scene.add(debugCube);
     const resizeObserver = new ResizeObserver(() => this.resize());
     resizeObserver.observe(this.container);
     this.animate();
@@ -21359,16 +21622,17 @@ var Renderer3D = class {
     this.controls.enableZoom = false;
     this.controls.enablePan = false;
     this.controls.target.set(0, 0, 0);
+    this.controls.mouseButtons = {
+      LEFT: MOUSE.ROTATE,
+      MIDDLE: MOUSE.DOLLY,
+      RIGHT: MOUSE.PAN
+    };
+    this.controls.update();
+    this.controls.addEventListener("start", () => console.log("[Orbit] \u{1F7E2} START"));
+    this.controls.addEventListener("end", () => console.log("[Orbit] \u{1F534} END"));
   }
-  /**
-   * Architecture 6.0: Event Boundary Management
-   * Prevents Three.js gestures from triggering Obsidian's native pane dragging/scrolling
-   */
   setupEventBoundaries() {
     const canvas = this.renderer.domElement;
-    canvas.addEventListener("pointerdown", (e) => e.stopPropagation());
-    canvas.addEventListener("touchstart", (e) => e.stopPropagation(), { passive: false });
-    canvas.addEventListener("touchmove", (e) => e.stopPropagation(), { passive: false });
     canvas.addEventListener("click", (event) => {
       const rect = canvas.getBoundingClientRect();
       this.mouse.x = (event.clientX - rect.left) / rect.width * 2 - 1;
@@ -21379,6 +21643,7 @@ var Renderer3D = class {
         if (intersects.length > 0) {
           const instanceId = intersects[0].instanceId;
           if (instanceId !== void 0) {
+            console.log("[Raycast] Hit a Cube!");
             selectedSceneStore.set(this.currentNodes[instanceId]);
           }
         } else {
@@ -21391,18 +21656,14 @@ var Renderer3D = class {
       e.preventDefault();
       const scrollSpeed = 0.05;
       const delta = e.deltaY * scrollSpeed;
-      let newY = this.controls.target.y + delta;
-      const padding = 5;
-      newY = MathUtils.clamp(newY, this.timelineMinY - padding, this.timelineMaxY + padding);
-      const diff = newY - this.controls.target.y;
-      this.controls.target.y += diff;
-      this.camera.position.y += diff;
+      let newX = this.controls.target.x + delta;
+      const padding = 10;
+      newX = MathUtils.clamp(newX, this.timelineMinX - padding, this.timelineMaxX + padding);
+      const diff = newX - this.controls.target.x;
+      this.controls.target.x += diff;
+      this.camera.position.x += diff;
     }, { passive: false });
   }
-  /**
-   * Performance Strategy: InstancedMesh for 1000+ nodes
-   * Now driven entirely by Obsidian File Data
-   */
   updateNodes(nodes, bounds) {
     this.currentNodes = nodes;
     const count = nodes.length;
@@ -21415,8 +21676,8 @@ var Renderer3D = class {
     if (count === 0)
       return;
     const result = this.layoutEngine.compute(nodes, bounds.min, bounds.max);
-    this.timelineMinY = result.bounds.minY;
-    this.timelineMaxY = result.bounds.maxY;
+    this.timelineMinX = result.bounds.minX;
+    this.timelineMaxX = result.bounds.maxX;
     const geometry = this.tracker.track(new BoxGeometry(0.5, 0.5, 0.5));
     const material = this.tracker.track(new MeshStandardMaterial({ color: 4500189 }));
     this.instancedMesh = this.tracker.track(new InstancedMesh(geometry, material, count));
@@ -21437,9 +21698,6 @@ var Renderer3D = class {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   }
-  /**
-   * Architecture 9.3: Hard disposal on view close
-   */
   dispose() {
     cancelAnimationFrame(this.animationFrameId);
     if (this.controls)
@@ -21544,6 +21802,8 @@ function create_if_block(ctx) {
       attr(h3, "class", "svelte-o40b4b");
       attr(p, "class", "file-path svelte-o40b4b");
       attr(div0, "class", "inspector-header svelte-o40b4b");
+      attr(label0, "for", "valence-slider");
+      attr(input0, "id", "valence-slider");
       attr(input0, "type", "range");
       attr(input0, "min", "-1");
       attr(input0, "max", "1");
@@ -21552,6 +21812,8 @@ function create_if_block(ctx) {
       ctx[0].emotional.valence;
       attr(input0, "class", "svelte-o40b4b");
       attr(div1, "class", "slider-group svelte-o40b4b");
+      attr(label1, "for", "intensity-slider");
+      attr(input1, "id", "intensity-slider");
       attr(input1, "type", "range");
       attr(input1, "min", "0");
       attr(input1, "max", "1");
@@ -21723,7 +21985,7 @@ var InspectorPanel_default = InspectorPanel;
 
 // src/ui/App.svelte
 function add_css2(target) {
-  append_styles(target, "svelte-1jt2i6s", ".ne3d-wrapper.svelte-1jt2i6s{display:flex;flex-direction:column;height:100%;width:100%;overflow:hidden}.ne3d-toolbar.svelte-1jt2i6s{padding:10px;background-color:var(--background-secondary);border-bottom:1px solid var(--background-modifier-border);display:flex;justify-content:space-between;align-items:center}.ne3d-title.svelte-1jt2i6s{font-weight:bold;color:var(--text-normal)}.ne3d-workspace.svelte-1jt2i6s{display:flex;flex:1;overflow:hidden}.ne3d-canvas-container.svelte-1jt2i6s{flex:1;position:relative;height:100%}");
+  append_styles(target, "svelte-vji8pi", ".ne3d-wrapper.svelte-vji8pi{display:flex;flex-direction:column;height:100%;width:100%;overflow:hidden}.ne3d-toolbar.svelte-vji8pi{padding:10px;background-color:var(--background-secondary);border-bottom:1px solid var(--background-modifier-border);display:flex;justify-content:space-between;align-items:center}.ne3d-title.svelte-vji8pi{font-weight:bold;color:var(--text-normal)}.toolbar-text.svelte-vji8pi{color:var(--text-muted)}.ne3d-workspace.svelte-vji8pi{display:flex;flex:1;overflow:hidden}.ne3d-canvas-container.svelte-vji8pi{flex:1;position:relative;height:100%}");
 }
 function create_else_block2(ctx) {
   let t;
@@ -21778,7 +22040,7 @@ function create_fragment2(ctx) {
   let div0;
   let t1;
   let div1;
-  let p;
+  let span0;
   let t2;
   let t3_value = (
     /*$sceneStore*/
@@ -21786,7 +22048,7 @@ function create_fragment2(ctx) {
   );
   let t3;
   let t4;
-  let span;
+  let span1;
   let t5;
   let div4;
   let div3;
@@ -21817,26 +22079,27 @@ function create_fragment2(ctx) {
       div0.textContent = "Narrative Engine 3D";
       t1 = space();
       div1 = element("div");
-      p = element("p");
+      span0 = element("span");
       t2 = text("Scenes tracked: ");
       t3 = text(t3_value);
       t4 = space();
-      span = element("span");
+      span1 = element("span");
       if_block.c();
       t5 = space();
       div4 = element("div");
       div3 = element("div");
       t6 = space();
       create_component(inspectorpanel.$$.fragment);
-      attr(div0, "class", "ne3d-title svelte-1jt2i6s");
-      set_style(span, "margin-left", "20px");
-      set_style(span, "color", "var(--text-accent)");
+      attr(div0, "class", "ne3d-title svelte-vji8pi");
+      attr(span0, "class", "toolbar-text svelte-vji8pi");
+      set_style(span1, "margin-left", "20px");
+      set_style(span1, "color", "var(--text-accent)");
       attr(div1, "class", "ne3d-controls");
-      attr(div2, "class", "ne3d-toolbar svelte-1jt2i6s");
-      attr(div3, "class", "ne3d-canvas-container svelte-1jt2i6s");
+      attr(div2, "class", "ne3d-toolbar svelte-vji8pi");
+      attr(div3, "class", "ne3d-canvas-container no-drag svelte-vji8pi");
       set_style(div3, "touch-action", "none");
-      attr(div4, "class", "ne3d-workspace svelte-1jt2i6s");
-      attr(div5, "class", "ne3d-wrapper svelte-1jt2i6s");
+      attr(div4, "class", "ne3d-workspace svelte-vji8pi");
+      attr(div5, "class", "ne3d-wrapper svelte-vji8pi");
     },
     m(target, anchor) {
       insert(target, div5, anchor);
@@ -21844,12 +22107,12 @@ function create_fragment2(ctx) {
       append(div2, div0);
       append(div2, t1);
       append(div2, div1);
-      append(div1, p);
-      append(p, t2);
-      append(p, t3);
+      append(div1, span0);
+      append(span0, t2);
+      append(span0, t3);
       append(div1, t4);
-      append(div1, span);
-      if_block.m(span, null);
+      append(div1, span1);
+      if_block.m(span1, null);
       append(div5, t5);
       append(div5, div4);
       append(div4, div3);
@@ -21870,7 +22133,7 @@ function create_fragment2(ctx) {
         if_block = current_block_type(ctx2);
         if (if_block) {
           if_block.c();
-          if_block.m(span, null);
+          if_block.m(span1, null);
         }
       }
       const inspectorpanel_changes = {};
@@ -21913,10 +22176,7 @@ function instance2($$self, $$props, $$invalidate) {
   onMount(() => {
     $$invalidate(4, renderer = new Renderer3D(container));
     renderer.init();
-    renderer.updateNodes($sceneStore, {
-      min: $timelineBoundsStore.minDate,
-      max: $timelineBoundsStore.maxDate
-    });
+    renderer.updateNodes($sceneStore, $timelineBoundsStore);
   });
   onDestroy(() => {
     if (renderer)
@@ -21937,10 +22197,7 @@ function instance2($$self, $$props, $$invalidate) {
     50) {
       $:
         if (renderer && $sceneStore && $timelineBoundsStore) {
-          renderer.updateNodes($sceneStore, {
-            min: $timelineBoundsStore.minDate,
-            max: $timelineBoundsStore.maxDate
-          });
+          renderer.updateNodes($sceneStore, $timelineBoundsStore);
         }
     }
   };
@@ -21965,8 +22222,10 @@ var App_default = App;
 // src/NE3DView.ts
 var VIEW_TYPE_NE3D = "ne3d-view";
 var NE3DView = class extends import_obsidian.ItemView {
-  constructor(leaf) {
+  // NEW
+  constructor(leaf, writeQueue) {
     super(leaf);
+    this.writeQueue = writeQueue;
   }
   getViewType() {
     return VIEW_TYPE_NE3D;
@@ -21980,13 +22239,15 @@ var NE3DView = class extends import_obsidian.ItemView {
   async onOpen() {
     this.component = new App_default({
       target: this.contentEl,
-      props: {}
+      props: {
+        writeQueue: this.writeQueue
+        // NEW: Pass it as a prop to Svelte
+      }
     });
   }
   async onClose() {
-    if (this.component) {
+    if (this.component)
       this.component.$destroy();
-    }
   }
 };
 
@@ -22001,6 +22262,7 @@ var SceneIndexer = class {
     const nodes = [];
     let minDate = Infinity;
     let maxDate = -Infinity;
+    console.log(`[SceneIndexer] Scanning vault... Found ${files.length} markdown files total.`);
     for (const file of files) {
       if (this.targetFolder && !file.path.startsWith(this.targetFolder))
         continue;
@@ -22022,8 +22284,26 @@ var SceneIndexer = class {
       if (maxDate === -Infinity)
         maxDate = 0;
     }
+    console.log(`[SceneIndexer] Successfully parsed ${nodes.length} scenes.`);
+    console.log(`[SceneIndexer] Extracted Date Range: ${minDate} to ${maxDate}`);
     timelineBoundsStore.set({ min: minDate, max: maxDate });
     sceneStore.set(nodes);
+  }
+  // NEW: Robust Date Parser for 'YYYY-MM-DD HHMM' format
+  parseDateString(dateRaw) {
+    if (!dateRaw)
+      return 0;
+    if (typeof dateRaw === "number")
+      return dateRaw;
+    let dateStr = String(dateRaw).trim();
+    const match = dateStr.match(/^(\d{4}-\d{2}-\d{2})\s+(\d{2})(\d{2})$/);
+    if (match) {
+      dateStr = `${match[1]}T${match[2]}:${match[3]}:00`;
+    } else {
+      dateStr = dateStr.replace(" ", "T");
+    }
+    const timestamp = Date.parse(dateStr);
+    return isNaN(timestamp) ? 0 : timestamp;
   }
   parseFile(file) {
     if (!file.path.startsWith("02_Eras/Era_01/Summaries"))
@@ -22036,7 +22316,8 @@ var SceneIndexer = class {
       id: file.path,
       title: file.basename,
       file,
-      storyDate: (fm == null ? void 0 : fm.storyDate) ? Number(fm.storyDate) : 0,
+      // FIX: Use the new date parser and check for snake_case "story_date"
+      storyDate: this.parseDateString(fm == null ? void 0 : fm.story_date),
       era: (fm == null ? void 0 : fm.era) ? Number(fm.era) : 1,
       emotional: {
         valence: (fm == null ? void 0 : fm.valence) ? Number(fm.valence) : 0,

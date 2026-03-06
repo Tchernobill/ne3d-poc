@@ -1,15 +1,9 @@
-// src/engine/Renderer3D.ts
-
 import * as THREE from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ResourceTracker } from './ResourceTracker';
 import { TimelineLayout } from './TimelineLayout';
 import { SceneNode, selectedSceneStore } from './SceneStore';
 
-/**
- * Architecture 11.5: Renderer3D
- * Owns Three.js scene, uses ResourceTracker, enforces event boundaries.
- */
 export class Renderer3D {
   private container: HTMLDivElement;
   private scene!: THREE.Scene;
@@ -26,9 +20,8 @@ export class Renderer3D {
   private layoutEngine = new TimelineLayout();
   private instancedMesh!: THREE.InstancedMesh;
 
-  // NEW: Store physical boundaries for scrolling
-  private timelineMinY: number = 0;
-  private timelineMaxY: number = 100;
+  private timelineMinX: number = 0;
+  private timelineMaxX: number = 100;
 
   constructor(container: HTMLDivElement) {
     this.container = container;
@@ -43,17 +36,38 @@ export class Renderer3D {
     this.scene.background = new THREE.Color(0x1e1e1e);
 
     this.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    this.camera.position.set(0, 0, 15); // Start at Y=0
+    this.camera.position.set(0, 0, 30); // Pull camera back to see X-Axis
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(width, height);
     this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.container.appendChild(this.renderer.domElement);
+    
+    // 🛠️ MOUSE FIX: Apply strict CSS to the canvas to block Obsidian interference
+    const canvas = this.renderer.domElement;
+    canvas.classList.add('no-drag'); // Tell Obsidian NOT to drag the pane
+    canvas.style.position = 'absolute';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.zIndex = '10'; // Force it to the top
+    canvas.style.touchAction = 'none'; // Critical for capturing pointer events
+
+    this.container.appendChild(canvas);
 
     this.setupLighting();
     this.setupControls();
     this.setupEventBoundaries();
     
+    // Debug Axes & Origin
+    const axesHelper = this.tracker.track(new THREE.AxesHelper(10));
+    this.scene.add(axesHelper);
+
+    const debugGeo = this.tracker.track(new THREE.BoxGeometry(4, 4, 4));
+    const debugMat = this.tracker.track(new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true }));
+    const debugCube = this.tracker.track(new THREE.Mesh(debugGeo, debugMat));
+    this.scene.add(debugCube);
+
     const resizeObserver = new ResizeObserver(() => this.resize());
     resizeObserver.observe(this.container);
 
@@ -73,24 +87,30 @@ export class Renderer3D {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     
-    // NEW: Strict Camera Constraints
-    this.controls.enableZoom = false; // Disable normal scroll zooming
-    this.controls.enablePan = false;  // Disable right-click free panning
-    this.controls.target.set(0, 0, 0); // Lock focus to center X and Z
+    this.controls.enableZoom = false; 
+    this.controls.enablePan = false;  
+    this.controls.target.set(0, 0, 0); 
+
+    // Explicitly define the mouse mapping
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT: THREE.MOUSE.PAN
+    };
+    
+    this.controls.update();
+
+    // 🛠️ DEBUGGER: We will now see these trigger!
+    this.controls.addEventListener('start', () => console.log('[Orbit] 🟢 START'));
+    this.controls.addEventListener('end', () => console.log('[Orbit] 🔴 END'));
   }
 
-  /**
-   * Architecture 6.0: Event Boundary Management
-   * Prevents Three.js gestures from triggering Obsidian's native pane dragging/scrolling
-   */
   private setupEventBoundaries() {
     const canvas = this.renderer.domElement;
 
-    canvas.addEventListener('pointerdown', (e) => e.stopPropagation());
-    canvas.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: false });
-    canvas.addEventListener('touchmove', (e) => e.stopPropagation(), { passive: false });
-
-    // RAYCASTING
+    // We removed 'pointerdown' stopPropagation so OrbitControls can breathe.
+    
+    // RAYCASTING: Detect clicks on our cubes
     canvas.addEventListener('click', (event) => {
       const rect = canvas.getBoundingClientRect();
       this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
@@ -103,6 +123,7 @@ export class Renderer3D {
         if (intersects.length > 0) {
           const instanceId = intersects[0].instanceId;
           if (instanceId !== undefined) {
+            console.log("[Raycast] Hit a Cube!");
             selectedSceneStore.set(this.currentNodes[instanceId]); 
           }
         } else {
@@ -111,33 +132,26 @@ export class Renderer3D {
       }
     });
 
-    // CUSTOM WHEEL SCROLLING (Elevator along Y-Axis)
+    // CUSTOM SCROLL WHEEL (Pan Camera along X-Axis)
     canvas.addEventListener('wheel', (e) => {
       e.stopPropagation();
-      e.preventDefault(); // Stop normal zoom and page scroll
+      e.preventDefault();
 
       const scrollSpeed = 0.05;
       const delta = e.deltaY * scrollSpeed;
 
-      // Calculate new target Y position
-      let newY = this.controls.target.y + delta;
+      let newX = this.controls.target.x + delta; 
       
-      // Constrain scrolling to the physical bounds of the timeline
-      const padding = 5;
-      newY = THREE.MathUtils.clamp(newY, this.timelineMinY - padding, this.timelineMaxY + padding);
+      const padding = 10;
+      newX = THREE.MathUtils.clamp(newX, this.timelineMinX - padding, this.timelineMaxX + padding);
 
-      // Move both target and camera together to create a smooth panning elevator effect
-      const diff = newY - this.controls.target.y;
-      this.controls.target.y += diff;
-      this.camera.position.y += diff;
+      const diff = newX - this.controls.target.x;
+      this.controls.target.x += diff;
+      this.camera.position.x += diff;
 
     }, { passive: false });
   }
 
-  /**
-   * Performance Strategy: InstancedMesh for 1000+ nodes
-   * Now driven entirely by Obsidian File Data
-   */
   updateNodes(nodes: SceneNode[], bounds: {min: number, max: number}) {
     this.currentNodes = nodes;
     const count = nodes.length;
@@ -151,12 +165,10 @@ export class Renderer3D {
 
     if (count === 0) return;
 
-    // Use the new TimelineLayout math
     const result = this.layoutEngine.compute(nodes, bounds.min, bounds.max);
     
-    // Update camera constraints based on actual node spread
-    this.timelineMinY = result.bounds.minY;
-    this.timelineMaxY = result.bounds.maxY;
+    this.timelineMinX = result.bounds.minX;
+    this.timelineMaxX = result.bounds.maxX;
 
     const geometry = this.tracker.track(new THREE.BoxGeometry(0.5, 0.5, 0.5));
     const material = this.tracker.track(new THREE.MeshStandardMaterial({ color: 0x44aadd }));
@@ -188,9 +200,6 @@ export class Renderer3D {
     this.renderer.render(this.scene, this.camera);
   }
 
-  /**
-   * Architecture 9.3: Hard disposal on view close
-   */
   dispose() {
     cancelAnimationFrame(this.animationFrameId);
     if (this.controls) this.controls.dispose();

@@ -30,15 +30,15 @@
     </div>
     
     <div class="slider-group">
-      <label>Valence (Positive/Negative): {$selectedSceneStore.emotional.valence.toFixed(2)}</label>
-      <input type="range" min="-1" max="1" step="0.1" 
+      <label for="valence-slider">Valence (Positive/Negative): {$selectedSceneStore.emotional.valence.toFixed(2)}</label>
+      <input id="valence-slider" type="range" min="-1" max="1" step="0.1" 
              value={$selectedSceneStore.emotional.valence} 
              on:input={handleValence} />
     </div>
 
     <div class="slider-group">
-      <label>Intensity (Low/High): {$selectedSceneStore.emotional.intensity.toFixed(2)}</label>
-      <input type="range" min="0" max="1" step="0.1" 
+      <label for="intensity-slider">Intensity (Low/High): {$selectedSceneStore.emotional.intensity.toFixed(2)}</label>
+      <input id="intensity-slider" type="range" min="0" max="1" step="0.1" 
              value={$selectedSceneStore.emotional.intensity} 
              on:input={handleIntensity} />
     </div>

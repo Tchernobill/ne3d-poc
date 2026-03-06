@@ -1,39 +1,44 @@
-﻿// esbuild.config.mjs
-import esbuild from "esbuild";
+﻿import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
 import esbuildSvelte from "esbuild-svelte";
 import sveltePreprocess from "svelte-preprocess";
 
-const prod = (process.argv[2] === "production");
+const mode = process.argv[2];
+const prod = mode === "production";
+const watch = mode === "watch";
 
 const context = await esbuild.context({
-  banner: { js: "/* NE3D Proof of Concept */" },
-  entryPoints: ["src/main.ts"],
+  entryPoints:["src/main.ts"],
   bundle: true,
+  format: "cjs",
+  platform: "browser",
+  target: "es2018",
+  mainFields: ["module", "main"],
+  conditions: ["import"],
+  // 🛠️ THE FIX: The '$' forces an EXACT match, eliminating the Multiple Instances bug
+  alias: {
+    "three$": "three/build/three.module.js"
+  },
   external:[
     "obsidian",
     "electron",
     ...builtins
   ],
-   platform: "browser",
-  format: "cjs",
-  target: "es2018",
-  logLevel: "info",
-  sourcemap: prod ? false : "inline",
-  treeShaking: true,
   outfile: "main.js",
   plugins:[
     esbuildSvelte({
-      compilerOptions: { css: "injected" }, // Injects Svelte CSS directly into the JS bundle
+      compilerOptions: { css: "injected" },
       preprocess: sveltePreprocess(),
     }),
   ],
 });
 
-if (prod) {
-  await context.rebuild();
-  process.exit(0);
-} else {
+if (watch) {
   await context.watch();
+  console.log("Watching for changes...");
+} else {
+  await context.rebuild();
+  console.log("Build complete.");
+  process.exit(0);
 }

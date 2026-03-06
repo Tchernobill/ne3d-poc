@@ -1,11 +1,9 @@
-// src/engine/TimelineLayout.ts
-
 import { SceneNode } from './SceneStore';
 import * as THREE from 'three';
 
 export interface LayoutBounds {
-  minY: number;
-  maxY: number;
+  minX: number;
+  maxX: number;
 }
 
 export class TimelineLayout {
@@ -13,29 +11,28 @@ export class TimelineLayout {
     const matrices: THREE.Matrix4[] =[];
     const dummy = new THREE.Object3D();
 
-    // Define the total physical height of the 3D timeline (scales with node count)
-    const timelineHeight = Math.max(nodes.length * 3.0, 10);
+    // Define the total physical width of the 3D timeline
+    const timelineWidth = Math.max(nodes.length * 3.0, 10);
     const dateRange = maxDate - minDate;
 
     nodes.forEach((node) => {
-      // Y-AXIS: Proportional position in time
-      let y = 0;
+      // X-AXIS (Left-to-Right): Proportional position in time
+      let x = 0;
       if (dateRange > 0) {
         const proportion = (node.storyDate - minDate) / dateRange;
-        y = proportion * timelineHeight;
+        x = proportion * timelineWidth;
       } else {
-        y = timelineHeight / 2; // Fallback if all dates are the same
+        x = timelineWidth / 2; 
       }
       
-      // X-AXIS: Emotional Valence (swapped from Y)
-      const x = node.emotional.valence * 5.0; 
+      // Y-AXIS (Up/Down): Emotional Valence
+      const y = node.emotional.valence * 5.0; 
       
-      // Z-AXIS: Era or spatial separation
+      // Z-AXIS (Depth): Era or spatial separation
       const z = node.era * -3.0;
 
       dummy.position.set(x, y, z);
       
-      // Scale based on emotional intensity
       const scale = 0.5 + (node.emotional.intensity * 1.5);
       dummy.scale.set(scale, scale, scale);
 
@@ -45,7 +42,7 @@ export class TimelineLayout {
 
     return { 
       matrices, 
-      bounds: { minY: 0, maxY: timelineHeight } 
+      bounds: { minX: 0, maxX: timelineWidth } 
     };
   }
 }

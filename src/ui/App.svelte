@@ -13,17 +13,15 @@
   onMount(() => {
     renderer = new Renderer3D(container);
     renderer.init();
-    // Pass both the nodes and the bounds
-    renderer.updateNodes($sceneStore, { min: $timelineBoundsStore.minDate, max: $timelineBoundsStore.maxDate });
+    renderer.updateNodes($sceneStore, $timelineBoundsStore);
   });
 
   onDestroy(() => {
     if (renderer) renderer.dispose();
   });
 
-  // Reactive trigger updates if nodes or bounds change
   $: if (renderer && $sceneStore && $timelineBoundsStore) {
-    renderer.updateNodes($sceneStore, { min: $timelineBoundsStore.minDate, max: $timelineBoundsStore.maxDate });
+    renderer.updateNodes($sceneStore, $timelineBoundsStore);
   }
 </script>
 
@@ -31,7 +29,7 @@
   <div class="ne3d-toolbar">
     <div class="ne3d-title">Narrative Engine 3D</div>
     <div class="ne3d-controls">
-      <p>Scenes tracked: {$sceneStore.length}</p>
+      <span class="toolbar-text">Scenes tracked: {$sceneStore.length}</span>
       <span style="margin-left: 20px; color: var(--text-accent);">
         {#if $selectedSceneStore}
           Selected: {$selectedSceneStore.title}
@@ -43,7 +41,7 @@
   </div>
 
   <div class="ne3d-workspace">
-    <div bind:this={container} class="ne3d-canvas-container" style="touch-action: none;"></div>
+    <div bind:this={container} class="ne3d-canvas-container  no-drag" style="touch-action: none;"></div>
     <InspectorPanel writeQueue={writeQueue} />
   </div>
 </div>
@@ -67,6 +65,9 @@
   .ne3d-title {
     font-weight: bold;
     color: var(--text-normal);
+  }
+  .toolbar-text {
+    color: var(--text-muted);
   }
   .ne3d-workspace {
     display: flex;
